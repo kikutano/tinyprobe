@@ -144,7 +144,7 @@ Not planned now. We reconsider them after M5.
 
 New ideas, not planned yet.
 
-- `ext` Bring the extension's copy of tinyprobe-app's `web/shared/` up to date (`scripts/dev.sh sync-shared`, VERSION from 0.2.0): the run view shows the request before the response and folds saved values (0.3.1), and has a call mode for a single request, with its HTTP status instead of PASSED (0.4.1), which the extension's ▶ Call should use (`reset(title, env, { call: true })`); the workflow diagram (`flow.js`) can come with it. Found while dogfooding on 2026-11-02.
+- `ext` The workflow diagram of tinyprobe-app in the extension (`media/shared/flow.js`, with `sync-shared`): the run view is shared and up to date since tinyprobe-vscode PR #13 (request before response, saved values folded, a call shown with its status instead of PASSED); the diagram is not copied yet.
 - `cli` `tinyprobe call` prints a green ✓ before its request line whatever the status (a 401 included): a single call is not a test (decision 0003), so its line should show the status without a verdict, as tinyprobe-app 0.4.1 does. An output change: it needs a short spec. Found while dogfooding on 2026-11-02.
 - `cli` Faster loading of large workflows: loading and validating cost about 0.2 ms per step (450 ms for 2000 steps, the same in 0.17.0), likely the arguments of every step being recomputed from the endpoint's templates. Profile before changing it.
 - `cli` `for_each` over a sequence (`use` with `for_each`): the steps of the sequence once per item, for a create/read/delete per item. Builds on spec 0012.
