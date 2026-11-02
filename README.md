@@ -9,7 +9,7 @@
 
 [![CI](https://github.com/kikutano/tinyprobe/actions/workflows/ci.yml/badge.svg)](https://github.com/kikutano/tinyprobe/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/kikutano/tinyprobe?include_prereleases)](https://github.com/kikutano/tinyprobe/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](License.md)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 [![VS Code extension](https://img.shields.io/github/v/release/kikutano/tinyprobe-vscode?label=VS%20Code%20extension&color=orange)](https://github.com/kikutano/tinyprobe-vscode)
 
 **[Install](#install)** · **[The app](#the-app)** · **[VS Code extension](#vs-code-extension)** · **[Try the example](#try-the-example)** · [Workflow format](docs/workflow-format.md) · [Guide for coding agents](docs/llm-guide.md) · [Roadmap](ROADMAP.md)
@@ -517,4 +517,8 @@ See [ROADMAP.md](ROADMAP.md).
 
 ## License
 
-MIT. See [License.md](License.md).
+Copyright (C) 2026 Gaetano Luigi Lenoci
+
+tinyprobe is free software: you can use, change and share it under the terms of the [GNU General Public License, version 3](LICENSE) (GPL-3.0-only). A changed version may be shared, even for a fee, only under the same license and together with its source code.
+
+Releases up to 0.21.0 were published under the MIT License, which still applies to them.

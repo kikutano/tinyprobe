@@ -182,7 +182,7 @@ jobs:
           labels: |
             org.opencontainers.image.title=tinyprobe
             org.opencontainers.image.description=API testing from the command line: endpoints and workflows in YAML.
-            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.licenses=GPL-3.0-only
 
       - uses: docker/build-push-action@v6
         with:
@@ -232,7 +232,7 @@ jobs:
           labels: |
             org.opencontainers.image.title=tinyprobe test server
             org.opencontainers.image.description=The test server of the tinyprobe examples. Fixed credentials on purpose: publish it on 127.0.0.1 only.
-            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.licenses=GPL-3.0-only
 
       - uses: docker/build-push-action@v6
         with:
