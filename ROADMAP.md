@@ -147,6 +147,6 @@ Not planned now. We reconsider them after M5.
 New ideas, not planned yet.
 
 - [x] `cli` `tinyprobe call` prints a green ✓ before its request line whatever the status (a 401 included): a single call is not a test (decision 0003), so its line should show the status without a verdict, as tinyprobe-app 0.4.1 does. Found while dogfooding on 2026-11-02. Spec: [0019](docs/specs/0019-call-without-verdict.md), PR #36.
-- `cli` Faster loading of large workflows: loading and validating cost about 0.2 ms per step (450 ms for 2000 steps, the same in 0.17.0), likely the arguments of every step being recomputed from the endpoint's templates. Profile before changing it.
+- [x] `cli` Faster loading of large workflows. Profiled on 2026-11-04 (`dotnet-trace`, 2000 steps): `inspect` and `call` parsed the YAML twice (once to tell a workflow from an API file, once to load it), YamlDotNet is about 60% of what is left, and the default name of each step recomputed its endpoint's placeholders. Both fixed in the PR `perf/load-once`: `inspect` of 2000 steps from 443 to 321 ms, of 8000 from 1917 to 1235 ms (AOT). Replacing YamlDotNet is not worth it.
 - `cli` `for_each` over a sequence (`use` with `for_each`): the steps of the sequence once per item, for a create/read/delete per item. Builds on spec 0012.
 - `ext` Publish to the VS Code Marketplace from the release workflow, without a token: Trusted Publishing when Microsoft ships it, or Microsoft Entra ID with a GitHub federated credential. Until then each `.vsix` is uploaded by hand.
