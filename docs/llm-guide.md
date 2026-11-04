@@ -12,7 +12,7 @@ You are going to write API tests for a backend with **tinyprobe**, a command-lin
 - `tinyprobe run <workflow.yaml> -e <env.yaml>` validates the whole workflow and its imports, then runs it and stops at the first failing step.
 - `tinyprobe run <folder> -e <env.yaml>` runs every workflow of the folder and its subfolders (API and env files are skipped), each from zero, also after a failing one, and ends with a summary. It validates every file before the first request. Exit `0` means every workflow passed.
 - `tinyprobe inspect <file.yaml>` validates an API or workflow file without sending anything, and lists its endpoints and steps.
-- `tinyprobe call <api.yaml> <endpoint> --with name=value -e <env.yaml>` sends one request and prints the whole response (status, headers, body), whatever the status. Use it to see the real shape of a response before writing checks. It remembers nothing: a token for a protected endpoint is passed with `--with` or `--var`.
+- `tinyprobe call <api.yaml> <endpoint> --with name=value -e <env.yaml>` sends one request and prints the whole response (status, headers, body), whatever the status. Its line starts with `→`, not with a verdict: read the status (`HTTP 401 Unauthorized`), since a call checks nothing; a `✗` means no response arrived. Use it to see the real shape of a response before writing checks. It remembers nothing: a token for a protected endpoint is passed with `--with` or `--var`.
 
 Exit codes: `0` all steps passed, `1` a step failed, `2` invalid workflow or arguments (nothing was sent).
 

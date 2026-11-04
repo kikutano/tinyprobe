@@ -377,7 +377,14 @@ tinyprobe inspect docs/example/api/testserver.yaml
 tinyprobe call docs/example/api/testserver.yaml status --with code=404 -e docs/environment.yaml
 ```
 
-`call` accepts any status, so a `404` is shown, not reported as a failure. Arguments are validated like a step's `with`: a missing required param or a misspelled name is an error.
+```text
+  → status code=404  GET    404    64.41ms  /api/status/404
+
+  HTTP 404 Not Found
+  ...
+```
+
+`call` accepts any status, so a `404` is shown, not reported as a failure: a single call is not a test, so its line starts with `→` and the status, with no ✓ or ✗. A ✗ means that no response arrived (exit code 1). Arguments are validated like a step's `with`: a missing required param or a misspelled name is an error.
 
 To look at one step of a flow, the one that needs the token and the ids of the steps before it, run the workflow up to it with `--to`: its number, as `inspect` lists the steps, or its name. The steps before it run again, so no state is kept between runs; the steps after it don't run and aren't counted.
 

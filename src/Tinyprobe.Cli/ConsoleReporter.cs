@@ -23,6 +23,7 @@ internal sealed class ConsoleReporter : IRunReporter
     private readonly bool _unicode;
     private readonly string _pass;
     private readonly string _fail;
+    private readonly string _sent;
     private int _nameWidth = MaxNameWidth;
     private bool _bannerShown;
 
@@ -34,6 +35,7 @@ internal sealed class ConsoleReporter : IRunReporter
         _unicode = console.Profile.Capabilities.Unicode;
         _pass = _unicode ? "✓" : "v";
         _fail = _unicode ? "✗" : "x";
+        _sent = _unicode ? "→" : ">";
     }
 
     public void WriteHeader(string version, string workflowPath, string? envPath,
@@ -189,9 +191,12 @@ internal sealed class ConsoleReporter : IRunReporter
     private static string StepsText(SuiteEntry entry) =>
         $"{entry.Summary.PassedSteps}/{entry.Summary.TotalSteps} steps";
 
-    private void WriteStep(StepReport step)
+    internal void WriteStep(StepReport step)
     {
-        var icon = step.IsSuccess ? $"[green]{_pass}[/]" : $"[red]{_fail}[/]";
+        // A single call is not a test (spec 0019): a response, whatever its status, gets no verdict, only the
+        // arrow and the colored status. A call with no response failed, and keeps its red mark.
+        var icon = ShowResponse && step.StatusCode is not null ? $"[grey]{_sent}[/]"
+            : step.IsSuccess ? $"[green]{_pass}[/]" : $"[red]{_fail}[/]";
         var name = Escape(TruncateName(step).PadRight(_nameWidth));
         var method = Escape((step.Method ?? "").PadRight(6));
         var duration = step.StatusCode is null ? "" : FormatDuration(step.Duration);
