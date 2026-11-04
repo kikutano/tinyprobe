@@ -3,7 +3,7 @@
 - **Status:** Implemented
 - **Roadmap:** Inbox (`cli`): `tinyprobe call` prints a green ✓ whatever the status
 - **Repositories:** tinyprobe
-- **PRs:** —
+- **PRs:** [#36](https://github.com/kikutano/tinyprobe/pull/36)
 
 ## Problem
 
