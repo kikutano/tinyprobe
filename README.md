@@ -160,7 +160,7 @@ tinyprobe run hello.yaml
 ```
 
 ```text
-  ⚡ tinyprobe 0.21.0
+  ⚡ tinyprobe 0.22.0
 
   workflow : Hello tinyprobe
   file     : hello.yaml
@@ -339,7 +339,7 @@ GitHub Actions, with the action of this repository:
 
 ```yaml
 - uses: actions/checkout@v4
-- uses: kikutano/tinyprobe@v0.21.0      # installs tinyprobe 0.21.0
+- uses: kikutano/tinyprobe@v0.22.0      # installs tinyprobe 0.22.0
   with:
     path: tinyprobe/workflows
     env-file: tinyprobe/env.ci.yaml
