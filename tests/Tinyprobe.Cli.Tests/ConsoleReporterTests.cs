@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using Spectre.Console;
 using Tinyprobe.Core.Models;
 
@@ -22,6 +23,9 @@ public sealed class ConsoleReporterTests
         return (new ConsoleReporter(console, live: false) { ShowResponse = call }, output);
     }
 
+    /// <summary>The text written, without the color codes some consoles add (CI forces them on).</summary>
+    private static string Text(StringWriter output) => Regex.Replace(output.ToString(), @"\x1b\[[0-9;]*m", "");
+
     private static StepReport Step(HttpStatusCode? status, bool success = true, string? failure = null) => new()
     {
         StepName = "login",
@@ -42,11 +46,11 @@ public sealed class ConsoleReporterTests
 
         reporter.WriteStep(Step(status));
 
-        var line = output.ToString().Split('\n')[0];
+        var line = Text(output).Split('\n')[0];
         Assert.StartsWith("  → login", line);
-        Assert.Contains($"POST   {(int)status}", line);
-        Assert.DoesNotContain("✓", output.ToString());
-        Assert.DoesNotContain("✗", output.ToString());
+        Assert.Matches($@"POST\s+{(int)status}\s", line);
+        Assert.DoesNotContain("✓", Text(output));
+        Assert.DoesNotContain("✗", Text(output));
     }
 
     [Fact]
@@ -56,9 +60,9 @@ public sealed class ConsoleReporterTests
 
         reporter.WriteStep(Step(null, success: false, failure: "Connection refused (localhost:1)"));
 
-        var lines = output.ToString().Split('\n');
+        var lines = Text(output).Split('\n');
         Assert.StartsWith("  ✗ login", lines[0]);
-        Assert.Contains("---", lines[0]);
+        Assert.Matches(@"POST\s+---", lines[0]);
         Assert.Equal("      ✗ Connection refused (localhost:1)", lines[1].TrimEnd());
     }
 
@@ -69,7 +73,7 @@ public sealed class ConsoleReporterTests
 
         reporter.WriteStep(Step(HttpStatusCode.Unauthorized));
 
-        Assert.StartsWith("  > login", output.ToString());
+        Assert.StartsWith("  > login", Text(output));
     }
 
     [Fact]
@@ -80,7 +84,7 @@ public sealed class ConsoleReporterTests
         reporter.WriteStep(Step(HttpStatusCode.OK));
         reporter.WriteStep(Step(HttpStatusCode.Unauthorized, success: false, failure: "expected status 200, got 401"));
 
-        var lines = output.ToString().Split('\n');
+        var lines = Text(output).Split('\n');
         Assert.StartsWith("  ✓ login", lines[0]);
         Assert.StartsWith("  ✗ login", lines[1]);
     }
