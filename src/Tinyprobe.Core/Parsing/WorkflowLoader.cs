@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Tinyprobe.Core.Definitions;
@@ -193,6 +194,12 @@ internal sealed partial class Loader
         var root = Open(text, fullPath, out var file);
         if (root is null)
             throw Problems();
+        return LoadWorkflow(file, root, fullPath);
+    }
+
+    /// <summary>A workflow from its parsed root: parsing is most of the cost of loading, so it is done once.</summary>
+    private WorkflowDefinition LoadWorkflow(FileContext file, YamlMappingNode root, string fullPath)
+    {
         if (root.Children.ContainsKey(new YamlScalarNode("sequence")))
         {
             Error(file, root, $"{file.Display} is a sequence, not a workflow: run it with `use:` from a workflow");
@@ -248,7 +255,7 @@ internal sealed partial class Loader
             throw Problems();
 
         if (root.Children.Keys.Any(k => k is YamlScalarNode { Value: "steps" }))
-            return LoadWorkflow(text, fullPath);
+            return LoadWorkflow(file, root, fullPath);
         if (root.Children.ContainsKey(new YamlScalarNode("sequence")))
             return LoadSequence(file, root, fullPath);
 
@@ -983,9 +990,12 @@ internal sealed partial class Loader
     /// An unnamed step is shown as its call plus the arguments that go into the path or query,
     /// e.g. <c>status code=200</c>. Body and header arguments are left out: they may be secrets.
     /// </summary>
+    // The arguments that show in a default name are the endpoint's, the same for every step that calls it.
+    private static readonly ConditionalWeakTable<EndpointDefinition, HashSet<string>> VisibleArguments = new();
+
     internal static string DefaultName(string call, EndpointDefinition endpoint, IEnumerable<KeyValuePair<string, string>> scalarArguments)
     {
-        var visible = TemplateRenderer.Placeholders(endpoint.Path.Node).Concat(endpoint.Query).ToHashSet();
+        var visible = VisibleArguments.GetValue(endpoint, e => TemplateRenderer.Placeholders(e.Path.Node).Concat(e.Query).ToHashSet());
         var arguments = scalarArguments.Where(a => visible.Contains(a.Key)).Select(a => $"{a.Key}={a.Value}");
         var name = string.Join(' ', [call, .. arguments]);
         return name.Length <= 40 ? name : call;
