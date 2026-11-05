@@ -524,29 +524,67 @@ internal sealed partial class Loader
                     Error(file, keyNode, $"unknown param '{key}' for sequence '{name}'{Suggest(key, parameters.Keys)}");
             }
         }
-        foreach (var (param, defaultValue) in parameters)
+        // for_each (spec 0020): the sequence once per item, each item's keys being params like with. Its steps are
+        // laid out now, so the items must be known now: a written list or a data file, not a variable.
+        List<IReadOnlyDictionary<string, Template>>? items = null;
+        if (entries.TryGetValue("for_each", out var forEachNode))
         {
-            if (defaultValue is null && !arguments.ContainsKey(param))
+            if (forEachNode is YamlScalarNode { Value: { } text } && LonePlaceholder().IsMatch(text))
+                Error(file, forEachNode, "for_each of a use step takes a list of items or { file: path }: the items of a variable are known only when the step runs");
+            else if (ParseForEach(file, forEachNode, arguments) is { Items: { } parsed })
+                items = parsed.ToList();
+        }
+        // An unknown key is reported at its first item: a CSV column would otherwise be reported on every line.
+        var unknown = new HashSet<string>();
+        for (int i = 0; i < (items?.Count ?? 0); i++)
+        {
+            foreach (var (key, value) in items![i])
             {
-                var declared = sequenceEntries.TryGetValue("params", out var paramsNode) ? At(sequenceFile, paramsNode).ToString() : sequenceFile.Display;
-                Error(file, item, $"missing required param '{param}' of sequence '{name}' (defined at {declared})");
+                if (!parameters.ContainsKey(key) && unknown.Add(key))
+                    Report(value.Location, $"item {i + 1} of for_each: unknown param '{key}' for sequence '{name}'{Suggest(key, parameters.Keys)}");
             }
         }
 
-        var use = new SequenceUse
+        var declared = sequenceEntries.TryGetValue("params", out var paramsNode) ? At(sequenceFile, paramsNode).ToString() : sequenceFile.Display;
+        foreach (var (param, defaultValue) in parameters)
         {
-            Name = entries.TryGetValue("name", out var nameNode) && Scalar(file, nameNode, "name") is { Length: > 0 } own ? own : name,
-            File = fullPath,
-            Arguments = arguments,
-            Params = parameters,
-            Parent = parent
-        };
+            if (defaultValue is not null || arguments.ContainsKey(param))
+                continue;
+            if (items is null)
+            {
+                Error(file, item, $"missing required param '{param}' of sequence '{name}' (defined at {declared})");
+                continue;
+            }
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (!items[i].ContainsKey(param))
+                    Error(file, item, $"missing required param '{param}' of sequence '{name}' in item {i + 1} of for_each (defined at {declared})");
+            }
+        }
+
+        var useName = entries.TryGetValue("name", out var nameNode) && Scalar(file, nameNode, "name") is { Length: > 0 } own ? own : name;
+        var uses = items is null
+            ? [new SequenceUse { Name = useName, File = fullPath, Arguments = arguments, Params = parameters, Parent = parent }]
+            : items.Select((values, i) => new SequenceUse
+            {
+                Name = useName,
+                File = fullPath,
+                // A key in both with and the item is already an error: the item's value is kept, not a crash.
+                Arguments = arguments.Concat(values).GroupBy(a => a.Key).ToDictionary(g => g.Key, g => g.Last().Value),
+                Params = parameters,
+                Parent = parent,
+                Item = i + 1,
+                Items = items.Count
+            }).ToList();
 
         _sequenceStack.Add(fullPath);
         try
         {
-            var steps = ParseSteps(sequenceFile, sequenceEntries["sequence"], use, reportedAt);
-            if (steps.Count == 0)
+            // The same steps for each item: a problem in them is reported once (Report keeps one of each).
+            var steps = new List<StepDefinition>();
+            foreach (var use in uses)
+                steps.AddRange(ParseSteps(sequenceFile, sequenceEntries["sequence"], use, reportedAt));
+            if (steps.Count == 0 && items is not { Count: 0 })
                 Error(sequenceFile, sequenceEntries["sequence"], "the sequence has no steps");
             return steps;
         }
@@ -908,7 +946,7 @@ internal sealed partial class Loader
 
             if (entries.TryGetValue("use", out var useNode))
             {
-                foreach (var key in new[] { "call", "for_each", "expect", "until", "save", "sleep" }.Where(entries.ContainsKey))
+                foreach (var key in new[] { "call", "expect", "until", "save", "sleep" }.Where(entries.ContainsKey))
                     Error(file, item, $"a use step cannot have '{key}'");
                 steps.AddRange(ExpandUse(file, item, useNode, entries, sequence, location));
                 continue;

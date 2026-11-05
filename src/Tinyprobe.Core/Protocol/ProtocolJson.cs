@@ -200,6 +200,11 @@ public static class ProtocolJson
             w.WriteStartObject("sequence");
             w.WriteString("name", use.Name);
             w.WriteString("file", use.File);
+            if (use.Item is { } item)
+            {
+                w.WriteNumber("item", item);
+                w.WriteNumber("items", use.Items ?? 0);
+            }
             w.WriteEndObject();
         }
         else

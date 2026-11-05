@@ -88,7 +88,7 @@ Takes a workflow or an API file (a file without `steps`). A workflow is validate
 - `kind` is `workflow`, `api` or `sequence`. An API file has an empty `steps` and `variables`. A sequence file (`inspect` of a file with `sequence:`) also has `params`, as an endpoint's, and its `steps`.
 - In a workflow, the steps of a sequence are listed where their `use` is, with consecutive indexes, as they run. Every step has:
   - `source_location`: where a sequence's step is written, in the sequence file, or `null`;
-  - `sequence`: `{ "name", "file" }` of the `use` it comes from, or `null`.
+  - `sequence`: `{ "name", "file" }` of the `use` it comes from, or `null`. When that `use` has `for_each`, it also has `item` (1-based) and `items` (the count): `{ "name": "User lifecycle", "file": "/…/user-lifecycle.yaml", "item": 2, "items": 3 }`. The run events have no `sequence`: there the step's `name` carries `[2/3]`.
 
   For those steps `location` is the `use` step's, the line a tool shows the result on.
 - `name` is the name a step calls. For an endpoint of a named import (`- billing: ../api/billing.yaml`) it is `billing.login`, and `import_name` is `billing`; otherwise `import_name` is `null`.

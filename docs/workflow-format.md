@@ -349,13 +349,55 @@ steps:
 
 **`use` in a workflow.**
 
-- `use: <path>`, with `with` for the params and an optional `name` that replaces the sequence's name in the report. A `use` step has no `call`, `expect`, `until`, `save` or `for_each`.
+- `use: <path>`, with `with` for the params and an optional `name` that replaces the sequence's name in the report. A `use` step has no `call`, `expect`, `until` or `save`; it may have `for_each` (below).
 - The sequence's steps run in its place, as if written there:
   - they see the workflow's variables;
   - their `save` values are visible to the next steps;
   - the workflow stops at the first failing step, inside the sequence or not.
 - An unknown param in `with`, or a missing required one, is an error with its location.
 - The report shows each step of the sequence as a step. The console, the JUnit report and the extension place it at the `use` line of the workflow. Errors in a sequence file point to that file.
+
+**A sequence once per item: `for_each` on `use`.** For a case made of several steps (create, read back, delete), a `use` step takes `for_each`: the sequence runs once per item, and each item's keys are params of the sequence, like `with` ([spec 0020](specs/0020-for-each-over-a-sequence.md)).
+
+```yaml
+# file: sequences/user-lifecycle.yaml
+name: User lifecycle
+import: [../api/users.yaml]
+params:
+  firstName:
+  city:
+sequence:
+  - name: Create
+    call: create_user
+    with: { firstName: "${firstName}", city: "${city}" }
+    expect: { status: 201 }
+    save: { userId: $.id }
+  - name: Delete
+    call: delete_user
+    with: { id: "${userId}" }
+    expect: { status: 204 }
+```
+
+```yaml
+steps:
+  - use: ../sequences/user-lifecycle.yaml
+    for_each:
+      - { firstName: Ada, city: Bari }
+      - { firstName: Grace, city: Lecce }
+```
+
+```text
+  ✓ User lifecycle [1/2] › Create  POST   201  1.08ms  /api/users
+  ✓ User lifecycle [1/2] › Delete  DELETE 204   665µs  /api/users/35
+  ✓ User lifecycle [2/2] › Create  POST   201   674µs  /api/users
+  ✓ User lifecycle [2/2] › Delete  DELETE 204   271µs  /api/users/36
+```
+
+- The items are a written list or a data file, `{ file: path }`, as for a call. A variable (`for_each: ${users}`) is an error: the steps of a sequence are laid out when the workflow loads, before a variable has its value.
+- Each item's keys are checked like `with`: an unknown param is an error with a suggestion, a required param must be in `with` or in every item, and a key in both `with` and an item is an error.
+- All the steps of item 1 run, then those of item 2. The workflow stops at the first failing step, as anywhere else.
+- The steps of a sequence may `save`: each item reads its own values. After the last item, its values stay visible to the next steps.
+- Steps are named `User lifecycle [2/2] › Create`; `--to` and `inspect` count the steps of every item.
 
 ## Repeating a step: `for_each`
 

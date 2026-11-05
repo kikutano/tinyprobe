@@ -99,7 +99,7 @@ e2e() {
 
   step "End-to-end (docs/example/workflows)"
   "$DEV_BIN" run docs/example/workflows -e docs/environment.yaml --var "baseUrl=$BASE_URL/" --junit "$DEV_DIR/junit.xml"
-  grep -q '<testsuites name="tinyprobe" tests="64" failures="0" errors="0" skipped="0"' "$DEV_DIR/junit.xml" \
+  grep -q '<testsuites name="tinyprobe" tests="70" failures="0" errors="0" skipped="0"' "$DEV_DIR/junit.xml" \
     || fail "unexpected JUnit report: $(head -2 "$DEV_DIR/junit.xml")"
 
   step "End-to-end (inspect, call, ndjson)"
