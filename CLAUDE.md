@@ -57,7 +57,7 @@ Use the `/add-feature` skill. In short, a format feature touches:
 
 1. `Definitions.cs` (model) → `WorkflowLoader.cs` (keys array + parsing + validation with location and suggestion) → `Execution/*` (behavior) → `WorkflowReport.cs` / `ProtocolJson.cs` (if it appears in results) → `ConsoleReporter.cs` (how people see it).
 2. Tests: loader (valid + every invalid case with its message), engine with `FakeServer`, protocol JSON if changed. Assert concrete values.
-3. Docs: `docs/workflow-format.md` (reference, remove it from "Not supported yet"), `docs/llm-guide.md` (agents), README table, `docs/protocol.md` if JSON changed. Update `docs/example` workflows when the feature can be exercised against the test server (add a test-server route if needed).
+3. Docs: `docs/workflow-format.md` (reference, remove it from "Not supported yet"), `docs/llm-guide.md` (agents), the README table ("The format at a glance"), `docs/protocol.md` if JSON changed. Update `docs/example` workflows when the feature can be exercised against the test server (add a test-server route if needed).
 4. Extension impact: does `../tinyprobe-vscode` need to show or send something new? If it relies on the feature, raise its `MINIMUM_VERSION`.
 5. `scripts/dev.sh check` green.
 

@@ -36,7 +36,7 @@ scripts/dev.sh install   # a development binary, linked as ~/.local/bin/tinyprob
 - **Native AOT**: no reflection. JSON is written by hand with `Utf8JsonWriter`; YAML is read through YamlDotNet's representation model only.
 - **Errors are precise**: every validation problem has a `file:line:column`, a clear message and a "did you mean" for typos. All problems are reported at once, before any request is sent.
 - **Tests assert concrete values**: loader tests for valid and invalid input (with the exact message), engine tests against `FakeServer`, protocol tests when JSON changes.
-- **Docs are tested**: every ```yaml block of the README, `docs/workflow-format.md` and `docs/llm-guide.md` must load. A format change updates all three. `docs/llm-guide.md` is embedded in the binary (`tinyprobe guide`).
+- **Docs are tested**: every ```yaml block of the README, `docs/workflow-format.md` and `docs/llm-guide.md` must load; `docs/cli.md` copies the `Usage` text of `Program.cs`. A format change updates all three. `docs/llm-guide.md` is embedded in the binary (`tinyprobe guide`).
 - **The protocol only grows**: new keys are fine; removing or changing one needs a new protocol version.
 - English for code, comments and docs. Comments explain *why*.
 

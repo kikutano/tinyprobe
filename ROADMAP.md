@@ -115,7 +115,7 @@ A Postman-like app for people who use neither a terminal nor VS Code: download i
 
 ## M6 — Tell the world
 
-- [ ] **M6-1** `repo` Rewrite `README.md` around the killer features, after M4 and M5: the migration done by the user's own AI and made reliable by the guide, the validation and the `inspect` / `call` / `run` loop (with the bench numbers); tests without hidden state (API files declare, workflows run); CI first (one binary, Docker image, GitHub Action, JUnit); one engine for the CLI, the extension, MCP and the app; no account and no cloud. Lead with what makes tinyprobe different, then install and quick start; move the reference material to `docs/`.
+- [~] **M6-1** `repo` Rewrite `README.md` around the killer features, after M4 and M5: the migration done by the user's own AI and made reliable by the guide, the validation and the `inspect` / `call` / `run` loop (with the bench numbers); tests without hidden state (API files declare, workflows run); CI first (one binary, Docker image, GitHub Action, JUnit); one engine for the CLI, the extension, MCP and the app; no account and no cloud. Lead with what makes tinyprobe different, then install and quick start; move the reference material to `docs/`.
 
 ## M7 — Later: more protocols and authentication
 

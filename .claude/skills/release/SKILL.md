@@ -12,7 +12,7 @@ Pushing a tag publishes binaries to every user (`tinyprobe update`, install scri
 1. On an up-to-date `main`, with a clean tree: `scripts/dev.sh check`. If `clang` is available, also `scripts/dev.sh aot` and run one workflow with `publish/tinyprobe`.
 2. Version: `git describe --tags --abbrev=0` gives the last one. SemVer: before 1.0, a breaking format or protocol change bumps the minor and needs a "Breaking change" section.
 3. Notes from `git log <last-tag>..HEAD --oneline` (merged PRs): a title line `tinyprobe X.Y.Z`, then highlights for users with a short YAML example per new feature, then breaking changes with what users must change. Write them in the scratchpad as `notes.md`.
-4. Check that README examples do not show an old version string in sample output if the output changed.
+4. Update the version in the examples of `README.md` and `docs/cli.md` (sample output, the action's tag, the Docker image tag, `TINYPROBE_VERSION`): `grep -n '0\.[0-9]*\.[0-9]' README.md docs/cli.md`.
    Set `version` in `agents/claude/.claude-plugin/plugin.json` to the new version and commit it before tagging: Claude Code updates the plugin when that version changes.
 5. Show the notes and the tag command to the user. After approval:
    `git tag -a vX.Y.Z --cleanup=whitespace -F notes.md && git push origin vX.Y.Z`
