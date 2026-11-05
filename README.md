@@ -11,6 +11,7 @@
 [![Release](https://img.shields.io/github/v/release/kikutano/tinyprobe?include_prereleases)](https://github.com/kikutano/tinyprobe/releases)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 [![VS Code extension](https://img.shields.io/github/v/release/kikutano/tinyprobe-vscode?label=VS%20Code%20extension&color=orange)](https://github.com/kikutano/tinyprobe-vscode)
+[![tinyprobe-app](https://img.shields.io/github/v/release/kikutano/tinyprobe-app?label=tinyprobe-app&color=orange)](https://github.com/kikutano/tinyprobe-app)
 
 **[Why tinyprobe](#why-tinyprobe)** · **[Install](#install)** · **[Quick start](#quick-start)** · **[Migrate with your AI](#migrate-with-your-ai)** · [Command line](docs/cli.md) · [Workflow format](docs/workflow-format.md) · [Guide for coding agents](docs/llm-guide.md) · [Roadmap](ROADMAP.md)
 
