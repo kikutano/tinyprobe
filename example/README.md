@@ -56,5 +56,5 @@ Workflows are also in the **Testing** view, one test per step. A mistake in a fi
 ## Next steps
 
 - Change a check, for example `$.name: Leanne Graham` in `01-read.yaml`, and run again to see how a failure is reported.
-- Point tinyprobe at your own API: copy this folder, set `baseUrl` in `environment.yaml` and describe your endpoints in `api/`. A coding agent can write them for you: see [Generate tests with a coding agent](../README.md#generate-tests-with-a-coding-agent).
+- Point tinyprobe at your own API: copy this folder, set `baseUrl` in `environment.yaml` and describe your endpoints in `api/`. A coding agent can write them for you: see [Migrate with your AI](../README.md#migrate-with-your-ai).
 - The complete format is in [docs/workflow-format.md](../docs/workflow-format.md).

@@ -101,6 +101,7 @@ public sealed partial class DocumentationTests : IDisposable
     [InlineData("README.md")]
     [InlineData("docs/llm-guide.md")]
     [InlineData("docs/workflow-format.md")]
+    [InlineData("docs/cli.md")]
     public void EveryYamlBlock_IsValidYaml(string markdownPath)
     {
         // Fragments (a step, an expect block) are not whole workflows, but they must still be YAML:

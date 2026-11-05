@@ -26,7 +26,7 @@ Find the task in `ROADMAP.md`. If it changes the YAML format, the CLI surface or
 2. Parsing and validation in `src/Tinyprobe.Core/Parsing/WorkflowLoader.cs`: add the key to the right keys array, parse it, collect problems (don't throw on the first one).
 3. Behavior in `src/Tinyprobe.Core/Execution/`.
 4. Results: `Models/WorkflowReport.cs`, `Protocol/ProtocolJson.cs` (new keys only; never remove or rename), `src/Tinyprobe.Cli/ConsoleReporter.cs`.
-5. New command or option: `src/Tinyprobe.Cli/Program.cs`, including the `Usage` text, which the README copies.
+5. New command or option: `src/Tinyprobe.Cli/Program.cs`, including the `Usage` text, which `docs/cli.md` copies.
 6. AOT: no reflection, no reflection-based JSON. Hand-written JSON with `Utf8JsonWriter` like the existing code.
 
 ## 4. Tests
@@ -40,7 +40,7 @@ Find the task in `ROADMAP.md`. If it changes the YAML format, the CLI surface or
 
 - `docs/workflow-format.md`: reference section; remove the item from "Not supported yet".
 - `docs/llm-guide.md`: how an agent should use it, and a "Common mistakes" entry if it is easy to get wrong. It is embedded in the binary (`tinyprobe guide`).
-- `README.md`: the steps table / usage block / examples.
+- `README.md`: the steps table and the examples; `docs/cli.md`: the usage block, CI and the other command-line reference.
 - `docs/protocol.md` for any new JSON key.
 - Every ```yaml block in the docs is loaded by `DocumentationTests`: it must be valid.
 
