@@ -290,6 +290,7 @@ Install it from the [VS Code Marketplace](https://marketplace.visualstudio.com/i
 - [docs/workflow-format.md](docs/workflow-format.md): the complete format.
 - [docs/llm-guide.md](docs/llm-guide.md): the guide for coding agents, also printed by `tinyprobe guide`.
 - [docs/protocol.md](docs/protocol.md): the JSON of `inspect --json`, the run events and the MCP tools.
+- [docs/comparison.md](docs/comparison.md): tinyprobe next to Postman, Bruno and Hurl, and when to choose which.
 - [example/](example/) and [docs/example/](docs/example/): a first look against a public API, and every feature against the test server.
 - [CONTRIBUTING.md](CONTRIBUTING.md): building from source and how changes are made. [ROADMAP.md](ROADMAP.md): what comes next.
 
