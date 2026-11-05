@@ -3,7 +3,7 @@
 - **Status:** Implemented
 - **Roadmap:** Inbox (`cli`): `for_each` over a sequence
 - **Repositories:** tinyprobe
-- **PRs:** —
+- **PRs:** [#40](https://github.com/kikutano/tinyprobe/pull/40)
 
 ## Problem
 
