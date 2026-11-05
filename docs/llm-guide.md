@@ -360,7 +360,7 @@ variables:
 
 - An item's keys must be arguments of the endpoint or variables used by the step (in `expect`, `until` or `with`). A key in both an item and `with` is an error: put shared values in `with`, varying ones in the items.
 - Every item runs, also after a failing one; then the workflow stops if any failed.
-- No `save` in a `for_each` step. Use `for_each` for checks; a flow that creates, reads and deletes stays a sequence of steps.
+- No `save` in a `for_each` step. Use `for_each` for checks; a case that creates, reads and deletes is a sequence run with `for_each` on its `use` (section 6e).
 - Data files go in `tinyprobe/data/`. CSV values are text; JSON keeps types.
 - Use `for_each` only when the steps differ by values. Different endpoints, different checks or a `save` mean different steps.
 
@@ -405,6 +405,51 @@ steps:
 - Check a sequence with `tinyprobe inspect tinyprobe/sequences/log-in.yaml`. `tinyprobe run` does not run it on its own; `tinyprobe run tinyprobe/workflows` skips sequence files anyway.
 - Write a sequence only for steps used by two workflows or more. A step used once stays in its workflow.
 - The auth workflow that tests the login itself (wrong password, missing token) calls `login` directly: those steps are the test, not a setup.
+
+**A case of several steps, once per item.** When each case creates something, reads it back and deletes it, write those steps in a sequence and give its `use` a `for_each`. Each item's keys are the sequence's params; each item's steps save and read their own values.
+
+```yaml
+# file: tinyprobe/sequences/note-lifecycle.yaml
+name: Note lifecycle
+import:
+  - ../api/backend.yaml
+params:
+  title:
+  pinned: false
+sequence:
+  - name: Create
+    call: create_note
+    with: { title: "${title}", pinned: "${pinned}" }
+    expect: { status: 201 }
+    save: { noteId: $.id }        # each item saves its own
+  - name: Read it back
+    call: get_note
+    with: { id: "${noteId}" }
+    expect:
+      body:
+        $.title: ${title}
+  - name: Delete
+    call: delete_note
+    with: { id: "${noteId}" }
+    expect: { status: 204 }
+```
+
+```yaml
+# file: tinyprobe/workflows/note-cases.yaml
+name: Notes, one case per item
+import:
+  - ../api/backend.yaml
+steps:
+  - use: ../sequences/log-in.yaml
+    with: { password: "${adminPassword}" }
+  - use: ../sequences/note-lifecycle.yaml
+    for_each:                     # the sequence once per item; the keys are its params
+      - { title: First }
+      - { title: Pinned, pinned: true }
+```
+
+- The items are a written list or `{ file: ../data/notes.csv }`. Never a variable (`for_each: ${notes}`) on a `use`: it is an error, since a sequence's steps are laid out before the workflow runs. To repeat one call over a saved list, use `for_each: ${notes}` on a call step.
+- The workflow stops at the first failing step: the items after it don't run.
 
 ## 7. Environment file
 
@@ -504,7 +549,8 @@ Safety: run workflows only against a **local or test** environment, never agains
 | `save: { sid: $.sid }` after a cookie login, then `Cookie: "sid=${sid}"` in the API file | nothing: the cookie jar sends the session cookie; `expect.cookies` to check it, `save: { x: { cookie: name } }` only to copy a cookie into a header |
 | `expect.headers: { Set-Cookie: sid=abc }` | `expect.cookies: { sid: { exists: true } }`: `Set-Cookie` holds every cookie and its attributes |
 | the same step copied for each test case, differing in one value | one step with `for_each`, one item per case |
-| `save` in a `for_each` step | `save` in a step without `for_each`; `for_each` steps only check |
+| `save` in a `for_each` step | `save` in a step without `for_each`; `for_each` steps only check. For create/read/delete per case, a sequence with `for_each` on its `use` |
+| `for_each: ${list}` on a `use` step | a written list or `{ file: path }` on a `use`; a variable only on a call step |
 | `status: ${code}` in a step without `for_each` | a literal status, or a `for_each` whose items give the status |
 | `file: tinyprobe/fixtures/a.png` in a workflow of `tinyprobe/workflows/`, or `--with file=tinyprobe/fixtures/a.png` in a `tinyprobe call` | `../fixtures/a.png`: paths are relative to the workflow, or to the API file for `call` |
 

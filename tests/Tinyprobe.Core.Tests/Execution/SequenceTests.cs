@@ -277,4 +277,84 @@ public sealed class SequenceTests : IDisposable
 
         Assert.Equal(["login", "me", "ping"], workflow.Endpoints.Keys.Order());
     }
+
+    // --- for_each over a sequence (docs/specs/0020-for-each-over-a-sequence.md) --------------------------------
+
+    [Fact]
+    public async Task ForEachOnAUse_RunsTheSequenceOncePerItem_EachWithItsOwnSaves()
+    {
+        var (report, server) = await RunAsync(Workflow("""
+              - use: ../sequences/log-in.yaml
+                with: { email: qa@example.com }
+                for_each:
+                  - { password: a }
+                  - { password: b }
+                  - { password: c }
+              - call: me
+            """));
+
+        Assert.All(report.StepReports, s => Assert.True(s.IsSuccess, s.FailureReason));
+        Assert.Equal(["Log in [1/3] › login", "Log in [2/3] › login", "Log in [3/3] › login", "me"], report.StepReports.Select(s => s.StepName));
+        Assert.Equal(
+            ["""{"email":"qa@example.com","password":"a"}""", """{"email":"qa@example.com","password":"b"}""", """{"email":"qa@example.com","password":"c"}"""],
+            server.Requests.Take(3).Select(r => r.Body));
+        // After the last item, its saved values stay visible.
+        Assert.Equal("Bearer tok-c", server.Requests[3].Headers["Authorization"]);
+    }
+
+    [Fact]
+    public async Task ForEachOnAUse_ReadsADataFile()
+    {
+        Write("data/passwords.csv", "password\nx\ny\n");
+        var (report, server) = await RunAsync(Workflow("""
+              - name: Admin
+                use: ../sequences/log-in.yaml
+                for_each: { file: ../data/passwords.csv }
+            """));
+
+        Assert.Equal(["Admin [1/2] › login", "Admin [2/2] › login"], report.StepReports.Select(s => s.StepName));
+        Assert.Equal(["x", "y"], server.Requests.Select(r => JsonDocument.Parse(r.Body!).RootElement.GetProperty("password").GetString()));
+    }
+
+    [Fact]
+    public async Task ForEachOnAUse_StopsTheWorkflow_AtTheFirstFailingStep()
+    {
+        var (report, server) = await RunAsync(Workflow("""
+              - use: ../sequences/log-in.yaml
+                for_each: [{ password: a }, { password: wrong }, { password: c }]
+            """), r => r.Body!.Contains("wrong") ? new FakeResponse(System.Net.HttpStatusCode.Unauthorized) : Respond(r));
+
+        Assert.Equal([true, false], report.StepReports.Select(s => s.IsSuccess));
+        Assert.Equal(2, server.Requests.Count);
+    }
+
+    [Fact]
+    public void ForEachOnAUse_GivesEachStepItsItem_InTheInspection()
+    {
+        var workflow = WorkflowLoader.Load(Workflow("  - use: ../sequences/log-in.yaml\n    for_each: [{ password: a }, { password: b }]\n"));
+
+        var steps = JsonDocument.Parse(ProtocolJson.Inspection("1.2.3", workflow)).RootElement.GetProperty("steps");
+        Assert.Equal([1, 2], steps.EnumerateArray().Select(s => s.GetProperty("sequence").GetProperty("item").GetInt32()));
+        Assert.All(steps.EnumerateArray(), s => Assert.Equal(2, s.GetProperty("sequence").GetProperty("items").GetInt32()));
+
+        var plain = WorkflowLoader.Load(Workflow("  - use: ../sequences/log-in.yaml\n    with: { password: a }\n", "workflows/plain.yaml"));
+        var sequence = JsonDocument.Parse(ProtocolJson.Inspection("1.2.3", plain)).RootElement.GetProperty("steps")[0].GetProperty("sequence");
+        Assert.False(sequence.TryGetProperty("item", out _));
+    }
+
+    [Theory]
+    [InlineData("  - use: ../sequences/log-in.yaml\n    for_each: [{ password: a }, { pasword: b }]",
+        "workflows/test.yaml:5:44: item 2 of for_each: unknown param 'pasword' for sequence 'Log in' (did you mean 'password'?)")]
+    [InlineData("  - use: ../sequences/log-in.yaml\n    for_each: [{ password: a }, { email: b@example.com }]",
+        "workflows/test.yaml:4:5: missing required param 'password' of sequence 'Log in' in item 2 of for_each (defined at sequences/log-in.yaml:4:3)")]
+    [InlineData("  - use: ../sequences/log-in.yaml\n    for_each: ${cases}",
+        "workflows/test.yaml:5:15: for_each of a use step takes a list of items or { file: path }: the items of a variable are known only when the step runs")]
+    [InlineData("  - use: ../sequences/log-in.yaml\n    with: { password: a }\n    for_each: [{ password: b }]",
+        "workflows/test.yaml:6:18: item 1 of for_each and with both set 'password': keep one")]
+    public void InvalidForEachOnAUse_IsReportedWithItsLocation(string steps, string expected)
+    {
+        var errors = LoadFails(Workflow(steps)).Errors.Select(Relative);
+
+        Assert.Contains(expected, errors);
+    }
 }

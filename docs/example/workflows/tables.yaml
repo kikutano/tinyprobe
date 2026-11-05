@@ -53,3 +53,8 @@ steps:
       body:
         $.id: ${id}
         $.email: ${email}
+
+  - use: ../sequences/user-lifecycle.yaml
+    for_each:                          # the sequence once per item: create, read, delete
+      - { firstName: Ada, city: Bari }
+      - { firstName: Grace, city: Lecce }

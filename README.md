@@ -253,7 +253,7 @@ steps:
 | In a step | Description |
 |---|---|
 | `call` / `with` | The endpoint to call and its arguments. |
-| `use` | Run a shared sequence of steps here (a login), with `with` for its params. |
+| `use` | Run a shared sequence of steps here (a login), with `with` for its params, or once per item with `for_each`. |
 | `expect` | `status`, and checks on the `body` (by JSONPath), `headers`, `cookies` and `duration`: equality, comparisons, `contains`, `in`, `any`, `matches` (a regular expression) and `schema` (JSON Schema, also from an OpenAPI document). |
 | `save` | Values of the response for the next steps, or a cookie's value. |
 | `for_each` | Repeat the call once per item: a list, a variable or a CSV or JSON file. |

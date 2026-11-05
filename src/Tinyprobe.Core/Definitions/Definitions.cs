@@ -169,8 +169,11 @@ public sealed class SequenceUse
     public IReadOnlyDictionary<string, Template?> Params { get; init; } = new Dictionary<string, Template?>();
     /// <summary>The <c>use</c> this one is written in, for a nested sequence.</summary>
     public SequenceUse? Parent { get; init; }
+    /// <summary>With <c>for_each</c> on the <c>use</c> step: this item (1-based) and how many there are (spec 0020).</summary>
+    public int? Item { get; init; }
+    public int? Items { get; init; }
 
-    internal string Prefix => $"{Parent?.Prefix}{Name} › ";
+    internal string Prefix => $"{Parent?.Prefix}{Name}{(Item is { } item ? $" [{item}/{Items}]" : "")} › ";
 }
 
 public sealed class SleepStep : StepDefinition

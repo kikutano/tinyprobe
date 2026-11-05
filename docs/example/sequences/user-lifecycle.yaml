@@ -1,0 +1,39 @@
+# A sequence run once per item with `for_each` on its `use` (tables.yaml):
+# create a user, read it back, delete it. Each item saves its own ${userId},
+# and the delete leaves the server's data as it was.
+name: User lifecycle
+description: Creates a user in a city, reads it back and deletes it.
+
+import:
+  - ../api/testserver.yaml
+
+params:
+  firstName:
+  city:
+
+sequence:
+  - name: Create
+    call: create_user
+    with:
+      firstName: ${firstName}
+      lastName: Lifecycle
+      email: "${firstName}-${$uuid}@example.com"
+      city: ${city}
+    expect:
+      status: 201
+    save:
+      userId: $.id
+
+  - name: Read it back
+    call: get_user
+    with: { id: "${userId}" }
+    expect:
+      body:
+        $.firstName: ${firstName}
+        $.address.city: ${city}
+
+  - name: Delete
+    call: delete_user
+    with: { id: "${userId}" }
+    expect:
+      status: 204
