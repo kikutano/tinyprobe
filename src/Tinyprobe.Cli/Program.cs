@@ -45,6 +45,8 @@ const string Usage = """
       --junit <file>          ('run' only) Also write a JUnit XML report, for CI servers.
       --to <step>             ('run' only, one workflow) Run up to this step, included, and stop:
                               its number, as 'inspect' lists the steps, or its name.
+      --skip <step>           ('run' only, one workflow) Leave this step out of this run, the file
+                              unchanged: its number or its name, as for --to. Repeatable.
       -v, --verbose           Print variables, requests and responses while running.
       --no-color              Disable colors (also honored: the NO_COLOR environment variable).
 
@@ -171,6 +173,7 @@ var positional = new List<string>();
 string? envFilePath = null;
 string? junitPath = null;
 string? stopAfter = null;
+var skip = new List<string>();
 string reporterName = "console";
 bool verbose = false, noColor = false, json = false, source = false;
 var variables = new List<KeyValuePair<string, string>>();
@@ -196,11 +199,11 @@ for (int i = 1; i < args.Length; i++)
         case "-v" or "--verbose" when command != "inspect":
             verbose = true;
             break;
-        case "--junit" or "--to" when command == "call":
+        case "--junit" or "--to" or "--skip" when command == "call":
             return UsageError($"Option '{option}' is not available for 'call'.");
         case "-e" or "--env" or "--reporter" or "--var" when command != "inspect":
         case "--with" when command == "call":
-        case "--junit" or "--to" when command == "run":
+        case "--junit" or "--to" or "--skip" when command == "run":
             if (i + 1 >= args.Length)
                 return UsageError($"Option '{option}' requires a value.");
             var value = args[++i];
@@ -214,6 +217,9 @@ for (int i = 1; i < args.Length; i++)
                     break;
                 case "--to":
                     stopAfter = value;
+                    break;
+                case "--skip":
+                    skip.Add(value);
                     break;
                 case "--reporter":
                     if (value is not ("console" or "ndjson"))
@@ -252,6 +258,9 @@ var filePath = positional[0];
 var suite = command == "run" && (positional.Count > 1 || Directory.Exists(filePath));
 if (suite && stopAfter is not null)
     return UsageError("--to runs one workflow file, not a folder or several files.");
+// A step's number means a different step in each file.
+if (suite && skip.Count > 0)
+    return UsageError("--skip applies to one workflow file, not a folder or several files.");
 IReadOnlyList<string> suiteFiles = [];
 if (suite)
 {
@@ -296,12 +305,12 @@ try
         workflow = command == "call"
             ? WorkflowLoader.CreateCall(WorkflowLoader.LoadAny(filePath), positional[1], arguments)
             : WorkflowLoader.Load(filePath);
-        // Run to here: the steps up to the one given, that one included.
-        if (stopAfter is not null)
+        // Run to here (the steps up to the one given, that one included) and the steps left out of this run.
+        if (stopAfter is not null || skip.Count > 0)
         {
-            if (!WorkflowLoader.TryStopAfter(workflow, stopAfter, out var upTo, out var stepError))
+            if (!WorkflowLoader.TryNarrow(workflow, stopAfter, skip, out var narrowed, out var stepError))
                 return UsageError(stepError);
-            workflow = upTo;
+            workflow = narrowed;
         }
     }
     if (envFilePath is not null)

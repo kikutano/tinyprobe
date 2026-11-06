@@ -26,6 +26,8 @@ internal sealed class ConsoleReporter : IRunReporter
     private readonly string _sent;
     private int _nameWidth = MaxNameWidth;
     private bool _bannerShown;
+    /// <summary><c>run --skip</c>: the skipped steps not printed yet, each printed in its place among the others.</summary>
+    private readonly Queue<(int Index, string Name)> _skipped = new();
 
     /// <param name="live">Show a spinner while steps run; ignored when the output is not interactive (CI, pipes).</param>
     public ConsoleReporter(IAnsiConsole console, bool live)
@@ -57,7 +59,8 @@ internal sealed class ConsoleReporter : IRunReporter
         if (environment.TryGetValue("baseUrl", out var baseUrl) && baseUrl.ValueKind == JsonValueKind.String)
             WriteHeaderRow("base url", baseUrl.GetString()!);
         if (!ShowResponse)
-            WriteHeaderRow("steps", steps.Count.ToString(CultureInfo.InvariantCulture));
+            WriteHeaderRow("steps", steps.Count.ToString(CultureInfo.InvariantCulture)
+                + (workflow.Skipped.Count > 0 ? $" ({workflow.Skipped.Count} skipped: --skip)" : ""));
 
         _console.WriteLine();
     }
@@ -96,9 +99,12 @@ internal sealed class ConsoleReporter : IRunReporter
         WorkflowEngine engine, WorkflowDefinition workflow, IReadOnlyDictionary<string, JsonElement> environment)
     {
         engine.StepCompleted += WriteStep;
+        _skipped.Clear();
+        foreach (var index in workflow.Skipped)
+            _skipped.Enqueue((index, workflow.Steps[index] is CallStep call ? call.Name : ((SleepStep)workflow.Steps[index]).Name));
 
         if (!_live)
-            return await engine.ExecuteAsync(workflow, environment);
+            return WriteLastSkipped(await engine.ExecuteAsync(workflow, environment));
 
         WorkflowReport? report = null;
         await _console.Status()
@@ -110,7 +116,25 @@ internal sealed class ConsoleReporter : IRunReporter
                 report = await engine.ExecuteAsync(workflow, environment);
             });
 
-        return report!;
+        return WriteLastSkipped(report!);
+    }
+
+    /// <summary>The skipped steps after the last one that ran, unless a failure stopped the run before them.</summary>
+    private WorkflowReport WriteLastSkipped(WorkflowReport report)
+    {
+        if (report.StepReports.All(s => s.IsSuccess))
+            WriteSkipped(int.MaxValue);
+        return report;
+    }
+
+    private void WriteSkipped(int before)
+    {
+        while (_skipped.TryPeek(out var step) && step.Index < before)
+        {
+            _skipped.Dequeue();
+            var name = step.Name.Length > _nameWidth ? step.Name[..(_nameWidth - 1)] + "…" : step.Name.PadRight(_nameWidth);
+            _console.MarkupLine($"  [grey]{(_unicode ? "–" : "-")} {Escape(name)}  skipped (--skip)[/]");
+        }
     }
 
     public void WriteSummary(WorkflowSummary summary, TimeSpan elapsed)
@@ -127,6 +151,7 @@ internal sealed class ConsoleReporter : IRunReporter
         WriteMetric("steps", $"{summary.PassedSteps}/{summary.TotalSteps} passed"
             + (summary.FailedSteps > 0 ? $"  [red]{summary.FailedSteps} failed[/]" : "")
             + (summary.NotRunSteps > 0 ? $"  [yellow]{summary.NotRunSteps} not run[/]" : "")
+            + (summary.SkippedSteps > 0 ? $"  [grey]{summary.SkippedSteps} skipped[/]" : "")
             + (summary.StoppedAfter is { } last ? $"  [grey](stopped after step {last + 1} of {summary.StepsInFile}: --to)[/]" : ""));
 
         var rate = elapsed.TotalSeconds > 0 ? summary.HttpRequests / elapsed.TotalSeconds : 0;
@@ -193,6 +218,7 @@ internal sealed class ConsoleReporter : IRunReporter
 
     internal void WriteStep(StepReport step)
     {
+        WriteSkipped(step.Index);
         // A single call is not a test (spec 0019): a response, whatever its status, gets no verdict, only the
         // arrow and the colored status. A call with no response failed, and keeps its red mark.
         var icon = ShowResponse && step.StatusCode is not null ? $"[grey]{_sent}[/]"

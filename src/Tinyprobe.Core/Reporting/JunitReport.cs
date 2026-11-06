@@ -19,6 +19,7 @@ public sealed record JunitRun(string File, WorkflowDefinition Workflow, Workflow
 public static class JunitReport
 {
     private const string NotRun = "Not run: an earlier step failed";
+    private const string SkippedByOption = "Skipped with --skip";
 
     public static string Write(string version, IReadOnlyList<JunitRun> runs)
     {
@@ -61,7 +62,8 @@ public static class JunitReport
             int? line = step.Location.Line > 0 ? step.Location.Line : null;
             if (!reports.TryGetValue(index, out var stepReports))
             {
-                cases.Add(new CaseXml(step.Name, run.Workflow.Name, run.File, line, TimeSpan.Zero, Outcome.Skipped, NotRun));
+                cases.Add(new CaseXml(step.Name, run.Workflow.Name, run.File, line, TimeSpan.Zero, Outcome.Skipped,
+                    run.Workflow.Skipped.Contains(index) ? SkippedByOption : NotRun));
                 continue;
             }
 

@@ -64,6 +64,8 @@ Options for 'run' and 'call':
   --junit <file>          ('run' only) Also write a JUnit XML report, for CI servers.
   --to <step>             ('run' only, one workflow) Run up to this step, included, and stop:
                           its number, as 'inspect' lists the steps, or its name.
+  --skip <step>           ('run' only, one workflow) Leave this step out of this run, the file
+                          unchanged: its number or its name, as for --to. Repeatable.
   -v, --verbose           Print variables, requests and responses while running.
   --no-color              Disable colors (also honored: the NO_COLOR environment variable).
 
@@ -162,6 +164,14 @@ tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml --to "O
 ```
 
 In VS Code, **Run to here** above each step does the same and shows that step's response.
+
+To leave a step out for a while, without changing the file, skip it with `--skip`: the step that deletes what you want to look at, a slow `sleep`, or a step against a service that is down today. It takes a number or a name, as `--to` does, and can be repeated. Skipped steps are printed as `– … skipped (--skip)` and are not counted: the run passes when the others pass. A later step that needs a value only a skipped step saves fails, and says which step was skipped.
+
+```bash
+tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml --skip 2 --skip "Search by name"
+```
+
+The next run without `--skip` runs every step, so a step left out never stays out by mistake in CI. tinyprobe-app turns steps off with ⊘ Skip on the diagram and passes them with `--skip`.
 
 ## Use tinyprobe from other tools
 

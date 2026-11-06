@@ -36,6 +36,8 @@ public sealed class WorkflowEngine
     private readonly TextWriter _log;
     private readonly CookieContainer _cookies;
     private OAuth2Tokens? _tokens;
+    /// <summary><c>run --skip</c>: each value a skipped step saves, with that step, to say why a later step lacks it.</summary>
+    private readonly Dictionary<string, (int Index, string Name)> _savedBySkipped = [];
 
     /// <summary>Raised before each step runs, and again before each new attempt of an <c>until</c> step.</summary>
     public event Action<StepProgress>? StepStarted;
@@ -76,8 +78,21 @@ public sealed class WorkflowEngine
 
         _log.WriteLine($"Executing workflow: {workflow.Name}");
 
+        _savedBySkipped.Clear();
+        var skipped = workflow.Skipped.ToHashSet();
         for (int index = 0; index < workflow.Steps.Count; index++)
         {
+            // A skipped step sends no event and leaves no report: run_started lists it (spec 0021).
+            if (skipped.Contains(index))
+            {
+                if (workflow.Steps[index] is CallStep left)
+                {
+                    foreach (var name in left.Save.Keys)
+                        _savedBySkipped[name] = (index, left.Name);
+                    _log.WriteLine($"Skipped: {left.Name}");
+                }
+                continue;
+            }
             if (workflow.Steps[index] is SleepStep sleep)
             {
                 StepStarted?.Invoke(new StepProgress(index, sleep.Name, IsSleep: true));
@@ -157,7 +172,7 @@ public sealed class WorkflowEngine
             {
                 StepStarted?.Invoke(new StepProgress(index, step.Name));
                 var failed = new StepReport { Index = index, StepName = step.Name };
-                Fail(failed, ex.Message);
+                Fail(failed, Explain(ex));
                 Completed(report, failed);
                 return false;
             }
@@ -203,7 +218,7 @@ public sealed class WorkflowEngine
     private static List<Dictionary<string, JsonElement>> VariableItems(string name, IVariableScope globals)
     {
         if (!globals.TryGet(name, out var value))
-            throw new InvalidOperationException($"Variable '{name}' is not defined.");
+            throw new UndefinedVariableException(name);
         if (value.ValueKind != JsonValueKind.Array)
             throw new InvalidOperationException($"for_each: '{name}' is {Kind(value)}, not a list of objects");
 
@@ -282,7 +297,7 @@ public sealed class WorkflowEngine
         catch (Exception ex)
         {
             // Undefined variables, invalid URLs, network errors: the step fails, the run goes on to the report.
-            Fail(report, ex is TaskCanceledException ? "Request timed out" : ex.Message);
+            Fail(report, ex is TaskCanceledException ? "Request timed out" : Explain(ex));
         }
     }
 
@@ -571,6 +586,12 @@ public sealed class WorkflowEngine
         response.Headers.TryGetValues(name, out var values) || response.Content.Headers.TryGetValues(name, out values)
             ? string.Join(", ", values)
             : null;
+
+    /// <summary>The message of a failure; a value missing because the step that saves it was skipped says so.</summary>
+    private string Explain(Exception ex) =>
+        ex is UndefinedVariableException undefined && _savedBySkipped.TryGetValue(undefined.Name, out var by)
+            ? $"Variable '{undefined.Name}' is not defined: step {by.Index + 1} ({by.Name}), which saves it, was skipped."
+            : ex.Message;
 
     private void Fail(StepReport report, string reason)
     {

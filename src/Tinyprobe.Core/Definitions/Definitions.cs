@@ -49,6 +49,11 @@ public sealed class WorkflowDefinition
     public int? StoppedAfter { get; init; }
     /// <summary>How many steps the workflow has in its file, the steps after <see cref="StoppedAfter"/> included.</summary>
     public int StepsInFile { get; init; }
+    /// <summary>
+    /// <c>run --skip</c>: the indexes of the steps left out of this run, in order; their place in <see cref="Steps"/>
+    /// stays, so every other step keeps the index <c>inspect</c> gives it.
+    /// </summary>
+    public IReadOnlyList<int> Skipped { get; init; } = [];
     /// <summary>The file is a sequence (<c>sequence:</c>), loaded on its own by <c>inspect</c>; it cannot run.</summary>
     public bool IsSequence { get; init; }
     /// <summary>A sequence's declared params, with their default (null = required).</summary>

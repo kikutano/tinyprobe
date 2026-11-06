@@ -60,7 +60,7 @@ internal static partial class TemplateRenderer
 
         return scope.TryGet(name, out var value)
             ? value
-            : throw new InvalidOperationException($"Variable '{name}' is not defined.");
+            : throw new UndefinedVariableException(name);
     }
 
     private static void Write(Utf8JsonWriter writer, YamlNode node, IVariableScope? scope)
@@ -137,4 +137,10 @@ internal static partial class TemplateRenderer
 
         writer.WriteStringValue(text);
     }
+}
+
+/// <summary>A placeholder whose variable no scope has; the engine names a skipped step that would have saved it.</summary>
+public sealed class UndefinedVariableException(string name) : InvalidOperationException($"Variable '{name}' is not defined.")
+{
+    public string Name { get; } = name;
 }
