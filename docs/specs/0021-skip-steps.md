@@ -1,9 +1,9 @@
 # 0021 — Skip steps in a run
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M5-8
 - **Repositories:** tinyprobe, tinyprobe-app (tinyprobe-vscode later, see the open questions)
-- **PRs:** —
+- **PRs:** [#42](https://github.com/kikutano/tinyprobe/pull/42), [tinyprobe-app#28](https://github.com/kikutano/tinyprobe-app/pull/28)
 
 ## Problem
 
@@ -154,8 +154,8 @@ Nothing changes in this task. The run view already marks steps without events as
   - a sleep, a `for_each` step and a step of a sequence skipped;
   - the missing saved value, with and without a value in the environment.
 - [x] `scripts/dev.sh e2e`: `users.yaml` against the test server with two reads skipped, by number and by name (skipping the delete would leave a user on the server).
-- [ ] tinyprobe-app: the switch in the diagram and the list, the switches passed to ▶ Run and ▶ Up to here, switches dropped when their step changes, and the switch hidden with an older tinyprobe.
-- [ ] `scripts/dev.sh check` passes in both repositories, along with the performance guard.
+- [x] tinyprobe-app: the switch in the diagram and the list, the switches passed to ▶ Run and ▶ Up to here, switches dropped when their step changes, and the switch hidden with an older tinyprobe.
+- [x] `scripts/dev.sh check` passes in both repositories, along with the performance guard.
 
 ## Open questions
 
