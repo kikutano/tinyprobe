@@ -1,6 +1,6 @@
 # 0021 — Skip steps in a run
 
-- **Status:** Draft
+- **Status:** Approved
 - **Roadmap:** M5-8
 - **Repositories:** tinyprobe, tinyprobe-app (tinyprobe-vscode later, see the open questions)
 - **PRs:** —
@@ -163,3 +163,13 @@ Nothing changes in this task. The run view already marks steps without events as
 3. **Skipping every step.** The proposal makes it an error. The alternative is a run of 0 steps that passes, which looks like a success while testing nothing. *Recommendation: an error.*
 4. **The extension.** Its diagram is the app's shared code, so the switch could follow cheaply. Doing it in this task means three releases at once. *Recommendation: CLI and app in this task; the extension in a follow-up task, M5-9.*
 5. **Where the app keeps the switches.** The proposal keeps them in the browser, per workflow, until they are turned back on, and they survive closing the app. The alternative keeps them only until the page is closed: safer against forgetting, but they have to be set again every time. *Recommendation: kept in the browser, with "2 steps skipped · Run all" always visible next to ▶ Run so they are not forgotten.*
+
+## Decisions
+
+Approved on 2026-11-06 with the recommendations:
+
+1. `--skip` takes the step's number, as `inspect` lists it, or its exact name, as `--to` does.
+2. A value that only a skipped step saves is found missing at run time: the step that needs it fails, naming the skipped step, and the run stops there as after any failure.
+3. Skipping every step is an error.
+4. CLI and app in this task; the extension in a follow-up task (M5-9).
+5. The app keeps the switches in the browser until they are turned back on, with "N steps skipped · Run all" next to ▶ Run.
