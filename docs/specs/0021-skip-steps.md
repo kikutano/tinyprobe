@@ -55,7 +55,8 @@ Rules:
 - **A value that only a skipped step saves.** A later step that uses that value fails, with a message that says why:
 
   ```text
-  ✗ Patch the user   variable 'userId' is not defined: step 8 (Create a user), which saves it, was skipped
+  ✗ Patch the user
+      ✗ Variable 'userId' is not defined: step 7 (Create a user), which saves it, was skipped.
   ```
 
   The rule is applied at run time, like the existing `Variable 'x' is not defined.` error. If the environment or `--var` gives the value, the later step uses it and does not fail.
@@ -91,7 +92,7 @@ $ tinyprobe run users.yaml --skip 14
 Error: --skip 14: the workflow has 12 steps
 
 $ tinyprobe run users.yaml --skip "Delete the usr"
-Error: --skip "Delete the usr": no step has this name (did you mean "Delete the user"?)
+Error: --skip "Delete the usr": no step has this name (did you mean 'Delete the user'?)
 
 $ tinyprobe run users.yaml --skip "Log in"
 Error: --skip "Log in": 2 steps have this name (1, 5): use the number
@@ -103,7 +104,7 @@ $ tinyprobe run users.yaml --skip 1 --skip 2 ... (every step)
 Error: --skip: every step of the workflow is skipped, nothing would run
 
 $ tinyprobe run tinyprobe/workflows --skip 3
-Error: --skip applies to one workflow file, not a folder
+Error: --skip applies to one workflow file, not a folder or several files.
 ```
 
 ## Protocol
@@ -126,7 +127,7 @@ Nothing changes in this task. The run view already marks steps without events as
 - **`docs/cli.md`:** `--skip` in the usage block and in "Explore an API", next to `--to`.
 - **`docs/llm-guide.md`:** when exploring, leave a destructive or slow step out with `--skip` instead of editing the workflow. Common mistake: committing a step that was commented out instead of skipped.
 - **`docs/protocol.md`:** `skipped`, `skipped_steps`, the JUnit `skipped`, and the MCP `skip` argument.
-- **`README.md`:** one line in the CLI section.
+- **`README.md`:** no change: the command line is documented in `docs/cli.md`.
 - **The binary's `Usage` text.**
 
 ## Out of scope
@@ -138,21 +139,21 @@ Nothing changes in this task. The run view already marks steps without events as
 
 ## Acceptance criteria
 
-- [ ] `--skip` by number and by name, repeatable, with every error above, and combined with `--to`.
-- [ ] Skipped steps:
+- [x] `--skip` by number and by name, repeatable, with every error above, and combined with `--to`.
+- [x] Skipped steps:
   - send no step events;
   - are listed in `run_started.skipped` and counted in `skipped_steps`;
   - are excluded from the exit code;
   - appear in JUnit with `<skipped>`.
-- [ ] The failure of a later step that uses a value only a skipped step saves names that step. A value given by the environment is used.
-- [ ] Console: the `–` line for each skipped step and `N skipped` in the summary.
-- [ ] MCP `run` with `skip`.
-- [ ] Unit and CLI tests:
+- [x] The failure of a later step that uses a value only a skipped step saves names that step. A value given by the environment is used.
+- [x] Console: the `–` line for each skipped step and `N skipped` in the summary.
+- [x] MCP `run` with `skip`.
+- [x] Unit and CLI tests:
   - number, name, duplicate name, out of range, a folder;
   - `--to` combined;
   - a sleep, a `for_each` step and a step of a sequence skipped;
   - the missing saved value, with and without a value in the environment.
-- [ ] `docs/example`: a CLI check in `scripts/dev.sh e2e` that skips the delete steps of `users.yaml` against the test server.
+- [x] `scripts/dev.sh e2e`: `users.yaml` against the test server with two reads skipped, by number and by name (skipping the delete would leave a user on the server).
 - [ ] tinyprobe-app: the switch in the diagram and the list, the switches passed to ▶ Run and ▶ Up to here, switches dropped when their step changes, and the switch hidden with an older tinyprobe.
 - [ ] `scripts/dev.sh check` passes in both repositories, along with the performance guard.
 

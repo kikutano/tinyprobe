@@ -152,14 +152,15 @@ One JSON object per line on standard output, written and flushed as soon as it h
 | `invalid` | the workflow is invalid: the only event, exit code `2` |
 
 ```json
-{"event":"run_started","protocol":1,"version":"0.9.0","workflow":"Users","file":"/home/me/project/tinyprobe/workflows/users.yaml","to":null,"env_file":"/home/me/project/tinyprobe/env.local.yaml","steps":[{"index":0,"type":"call","name":"Login"},{"index":1,"type":"sleep","name":"sleep 1s"}]}
+{"event":"run_started","protocol":1,"version":"0.9.0","workflow":"Users","file":"/home/me/project/tinyprobe/workflows/users.yaml","to":null,"skipped":[],"env_file":"/home/me/project/tinyprobe/env.local.yaml","steps":[{"index":0,"type":"call","name":"Login"},{"index":1,"type":"sleep","name":"sleep 1s"}]}
 {"event":"step_started","index":0,"type":"call","name":"Login","attempt":1,"iteration":null,"iterations":null}
 {"event":"step_completed","index":0,"name":"Login","success":true,"failure":null,"method":"POST","url":"http://localhost:8080/login","status":200,"expected_status":[200],"duration_ms":12.4,"attempts":1,"bytes_sent":48,"bytes_received":120,"assertions":[{"subject":"$.token","condition":"exists","actual":"\"eyJ...\"","passed":true}],"saved":{"token":"eyJ..."},"request":{"method":"POST","url":"http://localhost:8080/login","headers":[{"name":"Content-Type","value":"application/json; charset=utf-8"}],"body":"{\"email\":\"ada@example.com\",\"password\":\"...\"}"},"response":{"status":200,"reason":"OK","headers":[{"name":"Content-Type","value":"application/json"}],"body":"{\"token\":\"eyJ...\"}","body_truncated":false},"iterations":null}
 {"event":"step_started","index":1,"type":"sleep","name":"sleep 1s","attempt":1,"iteration":null,"iterations":null}
-{"event":"run_finished","success":true,"summary":{"total_steps":1,"passed_steps":1,"failed_steps":0,"not_run_steps":0,"stopped_after":null,"checks_passed":2,"checks_failed":0,"http_requests":1,"bytes_sent":48,"bytes_received":120,"duration_ms":1015.2,"http_req_duration_ms":{"avg":12.4,"min":12.4,"med":12.4,"max":12.4,"p90":12.4,"p95":12.4}}}
+{"event":"run_finished","success":true,"summary":{"total_steps":1,"passed_steps":1,"failed_steps":0,"not_run_steps":0,"stopped_after":null,"skipped_steps":0,"checks_passed":2,"checks_failed":0,"http_requests":1,"bytes_sent":48,"bytes_received":120,"duration_ms":1015.2,"http_req_duration_ms":{"avg":12.4,"min":12.4,"med":12.4,"max":12.4,"p90":12.4,"p95":12.4}}}
 ```
 
 - **`run --to`.** `run_started` has `to`, the index of the last step that runs, and lists only the steps up to it; `summary.stopped_after` repeats it. Both are `null` for a whole run. The steps after it are not counted anywhere, so `success` is `true` when every step up to it passed.
+- **`run --skip`.** `run_started` has `skipped`, the indexes of the steps left out of this run in order (`[]` for a whole run); they stay in its `steps`, so a tool can draw them. A skipped step sends no `step_started` and no `step_completed`. `summary.skipped_steps` counts them, sleeps included; they are not in `total_steps`, so `passed_steps + failed_steps + not_run_steps = total_steps` still holds and `success` is `true` when the steps that ran passed. A `for_each` step that is skipped counts as one. In the JUnit report each skipped call step is a test case with `<skipped message="Skipped with --skip"/>`.
 - `index` is the position of the step in the workflow, sleeps included, and matches `steps[].index` of `inspect` and `run_started`.
 - `step_completed` of a failed step has `success: false` and either `failure` (a status, network or variable problem) or failed `assertions`. Steps after it are not run: they are counted in `not_run_steps`.
 - `status` is `null` when no response was received, for example on a network error. Then `response` is `null` too, while `request` shows what was sent.
@@ -271,10 +272,11 @@ endpoints:
 | `guide` | none | the guide for agents, as text |
 | `inspect` | `file` | the JSON of `inspect --json` |
 | `call` | `file`, `endpoint`, `with`, `env_file`, `vars` | `endpoint`, then the keys of a `step_completed` event: `success`, `status`, `assertions`, `request`, `response`... |
-| `run` | `paths`, `env_file`, `vars`, `to` | `success`, and `workflows`: for each, `file`, `workflow`, `success`, `summary` (as in `run_finished`) and `steps` |
+| `run` | `paths`, `env_file`, `vars`, `to`, `skip` | `success`, and `workflows`: for each, `file`, `workflow`, `success`, `summary` (as in `run_finished`) and `steps` |
 
 - `with` and `vars` are JSON objects; their values keep their JSON type. `paths` is a list of workflow files and folders (one string is accepted too), read like `tinyprobe run`.
 - `to` (optional) is `--to`: a step number (as `inspect` numbers the steps, 1-based) or a step name. It needs one path, a workflow file; the run stops after that step, and `summary.stopped_after` is its index.
+- `skip` (optional) is `--skip`: a list of step numbers or names, left out of this run. It needs one path, a workflow file. Each skipped call step is in `steps`, in its place, as `{ "index", "name", "skipped": true }`, unless a failure stopped the run before it; `summary.skipped_steps` counts them.
 - The result is the JSON as the text content of the tool result.
 - In `run`, passing steps have no `request` and `response`; failed steps have both.
 - `call` accepts any status, like `tinyprobe call`: a `500` is a result, not an error.

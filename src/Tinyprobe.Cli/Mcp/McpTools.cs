@@ -97,13 +97,17 @@ internal sealed class McpTools(string version, Func<CookieContainer, HttpMessage
         }
 
         var (workflows, problems) = RunCommand.LoadSuite(files);
-        if (OptionalStep(arguments) is { } stopAfter && problems.Count == 0)
+        var stopAfter = OptionalStep(arguments);
+        var skip = SkippedSteps(arguments);
+        if ((stopAfter is not null || skip.Count > 0) && problems.Count == 0)
         {
             if (workflows.Count != 1 || Directory.Exists(paths[0]))
-                return ("'to' runs one workflow file: give one path, a workflow file.", true);
-            if (!WorkflowLoader.TryStopAfter(workflows[0].Workflow, stopAfter, out var upTo, out var stepError))
+                return (stopAfter is not null
+                    ? "'to' runs one workflow file: give one path, a workflow file."
+                    : "'skip' applies to one workflow file: give one path, a workflow file.", true);
+            if (!WorkflowLoader.TryNarrow(workflows[0].Workflow, stopAfter, skip, out var narrowed, out var stepError))
                 return (stepError, true);
-            workflows[0] = (workflows[0].File, upTo);
+            workflows[0] = (workflows[0].File, narrowed);
         }
         Dictionary<string, JsonElement> environment;
         try
@@ -180,6 +184,20 @@ internal sealed class McpTools(string version, Func<CookieContainer, HttpMessage
                 _ => throw new ToolArgumentException("'to' must be a step number or a step name.")
             }
             : null;
+
+    /// <summary>The <c>skip</c> argument of <c>run</c>: step numbers or names; one alone is accepted too.</summary>
+    private static List<string> SkippedSteps(JsonElement arguments)
+    {
+        if (!TryGet(arguments, "skip", out var value))
+            return [];
+        var items = value.ValueKind == JsonValueKind.Array ? value.EnumerateArray().ToList() : [value];
+        return items.Select(item => item.ValueKind switch
+        {
+            JsonValueKind.Number => item.GetRawText(),
+            JsonValueKind.String when item.GetString() is { Length: > 0 } name => name,
+            _ => throw new ToolArgumentException("'skip' must be a list of step numbers or step names.")
+        }).ToList();
+    }
 
     private static string? OptionalString(JsonElement arguments, string name)
     {
@@ -272,6 +290,18 @@ internal sealed class McpTools(string version, Func<CookieContainer, HttpMessage
                 s.WriteEndArray();
                 s.WriteString("description", "Run to here (like --to): with one workflow file, run up to this step, included, and stop. " +
                     "The step's number as inspect lists the steps (1-based), or its name. Use it to look at one step of a flow.");
+                s.WriteEndObject();
+                s.WriteStartObject("skip");
+                s.WriteString("type", "array");
+                s.WriteStartObject("items");
+                s.WriteStartArray("type");
+                s.WriteStringValue("integer");
+                s.WriteStringValue("string");
+                s.WriteEndArray();
+                s.WriteEndObject();
+                s.WriteString("description", "Steps to leave out of this run (like --skip), with one workflow file; the file is not changed. " +
+                    "Each is a step's number as inspect lists the steps (1-based), or its name. Use it to leave out a step that deletes " +
+                    "what you want to look at, or a slow one.");
                 s.WriteEndObject();
                 EnvironmentProperties(s);
             },

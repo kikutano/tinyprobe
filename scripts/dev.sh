@@ -125,6 +125,13 @@ e2e() {
     --reporter ndjson > "$DEV_DIR/to.ndjson"
   jq -e -s '.[0].to == 2 and (.[0].steps | length) == 3 and .[-1].success and .[-1].summary.stopped_after == 2' \
     "$DEV_DIR/to.ndjson" > /dev/null
+  # Skipped steps (spec 0021): two reads left out, by number and by name; the user is still created and deleted,
+  # so the server's data is left as it was.
+  "$DEV_BIN" run docs/example/workflows/users.yaml -e docs/environment.yaml --var "baseUrl=$BASE_URL/" \
+    --skip 2 --skip "Search by name" --reporter ndjson > "$DEV_DIR/skip.ndjson"
+  jq -e -s '.[0].skipped == [1, 3] and ([.[] | select(.event == "step_started") | .index] | index(1) == null)
+    and .[-1].success and .[-1].summary.skipped_steps == 2 and .[-1].summary.total_steps == 10' \
+    "$DEV_DIR/skip.ndjson" > /dev/null
   echo "Protocol checks passed."
 
   step "End-to-end (schema)"

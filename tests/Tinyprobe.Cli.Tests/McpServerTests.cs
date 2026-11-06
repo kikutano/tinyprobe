@@ -249,6 +249,30 @@ public sealed class McpServerTests : IDisposable
     }
 
     [Fact]
+    public async Task Run_WithSkip_LeavesTheStepsOut_AndListsThemInTheirPlace()
+    {
+        Write("api.yaml", Api);
+        var workflow = Workflow("a.yaml", "  - call: ok\n  - name: Broken\n    call: broken\n  - call: ok\n  - call: broken\n");
+
+        var (text, isError) = ToolResult(await CallTool("run", new { paths = workflow, skip = new object[] { "Broken", 4 } }));
+
+        Assert.False(isError);
+        var run = Json(text).GetProperty("workflows")[0];
+        Assert.True(run.GetProperty("success").GetBoolean());
+        Assert.Equal(2, run.GetProperty("summary").GetProperty("skipped_steps").GetInt32());
+        Assert.Equal(2, run.GetProperty("summary").GetProperty("total_steps").GetInt32());
+        var steps = run.GetProperty("steps").EnumerateArray().ToList();
+        Assert.Equal([0, 1, 2, 3], steps.Select(s => s.GetProperty("index").GetInt32()));
+        Assert.Equal([false, true, false, true], steps.Select(s => s.TryGetProperty("skipped", out var skipped) && skipped.GetBoolean()));
+        Assert.Equal("Broken", steps[1].GetProperty("name").GetString());
+        Assert.Equal(2, _server.Requests.Count);
+
+        Assert.Equal(("'skip' applies to one workflow file: give one path, a workflow file.", true),
+            ToolResult(await CallTool("run", new { paths = _directory, skip = new[] { 1 } })));
+        Assert.Equal(("--skip 9: the workflow has 4 steps", true), ToolResult(await CallTool("run", new { paths = workflow, skip = new[] { 9 } })));
+    }
+
+    [Fact]
     public async Task Run_WithTo_NeedsOneWorkflowFile_AndAStepOfIt()
     {
         Write("flows/api.yaml", Api);

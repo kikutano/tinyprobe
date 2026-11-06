@@ -340,6 +340,10 @@ public static class ProtocolJson
         w.WriteString("workflow", workflow.Name);
         w.WriteString("file", workflow.SourceFile);
         WriteNullableNumber(w, "to", workflow.StoppedAfter);
+        w.WriteStartArray("skipped");
+        foreach (var index in workflow.Skipped)
+            w.WriteNumberValue(index);
+        w.WriteEndArray();
         if (environmentFile is null)
             w.WriteNull("env_file");
         else
@@ -499,6 +503,7 @@ public static class ProtocolJson
         w.WriteNumber("failed_steps", summary.FailedSteps);
         w.WriteNumber("not_run_steps", summary.NotRunSteps);
         WriteNullableNumber(w, "stopped_after", summary.StoppedAfter);
+        w.WriteNumber("skipped_steps", summary.SkippedSteps);
         w.WriteNumber("checks_passed", summary.ChecksPassed);
         w.WriteNumber("checks_failed", summary.ChecksFailed);
         w.WriteNumber("http_requests", summary.HttpRequests);
@@ -589,18 +594,40 @@ public static class ProtocolJson
             w.WriteBoolean("success", run.Summary.IsSuccess);
             WriteRunSummary(w, run.Summary, run.Elapsed);
             w.WriteStartArray("steps");
-            foreach (var group in ByStep(run.Report.StepReports))
+            var groups = ByStep(run.Report.StepReports).ToList();
+            int next = 0;
+            foreach (var group in groups)
             {
+                WriteSkipped(w, run.Workflow, ref next, group[0].Index);
                 w.WriteStartObject();
                 // Passing steps leave out the request and the response, iterations included.
                 WriteStepGroup(w, group, exchange: r => !r.IsSuccess);
                 w.WriteEndObject();
             }
+            // Skipped steps after the last one that ran too, unless a failure stopped the run before them.
+            if (run.Summary.FailedSteps == 0)
+                WriteSkipped(w, run.Workflow, ref next, int.MaxValue);
             w.WriteEndArray();
             w.WriteEndObject();
         }
         w.WriteEndArray();
     });
+
+    /// <summary>The skipped call steps before <paramref name="before"/>, in their place: index, name and <c>skipped</c>.</summary>
+    private static void WriteSkipped(Utf8JsonWriter w, WorkflowDefinition workflow, ref int next, int before)
+    {
+        for (; next < workflow.Skipped.Count && workflow.Skipped[next] < before; next++)
+        {
+            var index = workflow.Skipped[next];
+            if (workflow.Steps[index] is not CallStep step)
+                continue;
+            w.WriteStartObject();
+            w.WriteNumber("index", index);
+            w.WriteString("name", step.Name);
+            w.WriteBoolean("skipped", true);
+            w.WriteEndObject();
+        }
+    }
 
     // --- helpers ---------------------------------------------------------------
 

@@ -28,6 +28,8 @@ public sealed class WorkflowSummary
     public int? StoppedAfter { get; init; }
     /// <summary>The steps of the workflow file, those after <see cref="StoppedAfter"/> included (sleeps too).</summary>
     public int StepsInFile { get; init; }
+    /// <summary><c>run --skip</c>: the steps left out of the run, sleeps included; they are not in <see cref="TotalSteps"/>.</summary>
+    public int SkippedSteps { get; init; }
 
     public bool IsSuccess => FailedSteps == 0 && NotRunSteps == 0;
 
@@ -51,7 +53,9 @@ public sealed class WorkflowSummary
         return new WorkflowSummary
         {
             // A for_each step is one step until it runs, then one per item.
-            TotalSteps = workflow.Steps.OfType<CallStep>().Count() + report.StepReports.Count(s => s.Iteration > 1),
+            TotalSteps = workflow.Steps.Where((s, i) => s is CallStep && !workflow.Skipped.Contains(i)).Count()
+                + report.StepReports.Count(s => s.Iteration > 1),
+            SkippedSteps = workflow.Skipped.Count,
             PassedSteps = report.StepReports.Count(s => s.IsSuccess),
             FailedSteps = report.StepReports.Count(s => !s.IsSuccess),
             StoppedAfter = workflow.StoppedAfter,

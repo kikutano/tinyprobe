@@ -55,53 +55,97 @@ public static class WorkflowLoader
     /// <c>run --to</c>: the workflow up to a step, that step included. <paramref name="step"/> is its number, as
     /// <c>inspect</c> lists the steps (1-based, sleeps and the steps of sequences included), or its exact name.
     /// </summary>
-    public static bool TryStopAfter(WorkflowDefinition workflow, string step, out WorkflowDefinition upTo, out string error)
+    public static bool TryStopAfter(WorkflowDefinition workflow, string step, out WorkflowDefinition upTo, out string error) =>
+        TryNarrow(workflow, step, [], out upTo, out error);
+
+    /// <summary>
+    /// <c>run --to</c> and <c>run --skip</c> (spec 0021): the steps up to <paramref name="to"/>, without those of
+    /// <paramref name="skip"/>. Both name steps as <c>inspect</c> lists them in the file, so they are found before
+    /// the workflow is cut; a skipped step after the target is ignored.
+    /// </summary>
+    public static bool TryNarrow(WorkflowDefinition workflow, string? to, IReadOnlyList<string> skip,
+        out WorkflowDefinition narrowed, out string error)
     {
-        upTo = workflow;
+        narrowed = workflow;
         error = "";
         var names = workflow.Steps.Select(s => s is CallStep call ? call.Name : ((SleepStep)s).Name).ToList();
 
-        int index;
-        if (int.TryParse(step, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var number))
+        var skipped = new SortedSet<int>();
+        foreach (var step in skip)
         {
-            if (number < 1 || number > names.Count)
-            {
-                error = $"--to {step}: the workflow has {names.Count} step{(names.Count == 1 ? "" : "s")}";
+            if (!TryFindStep(names, "--skip", step, out var index, out error))
                 return false;
-            }
-            index = number - 1;
-        }
-        else
-        {
-            var matches = names.Select((name, i) => (name, i)).Where(n => n.name == step).Select(n => n.i).ToList();
-            if (matches.Count == 0)
-            {
-                error = $"--to \"{step}\": no step has this name{Loader.Suggest(step, names.Distinct())}";
-                return false;
-            }
-            if (matches.Count > 1)
-            {
-                error = $"--to \"{step}\": {matches.Count} steps have this name ({string.Join(", ", matches.Select(i => i + 1))}): use the number";
-                return false;
-            }
-            index = matches[0];
+            skipped.Add(index);
         }
 
-        upTo = new WorkflowDefinition
+        int last = names.Count - 1;
+        if (to is not null)
+        {
+            if (!TryFindStep(names, "--to", to, out last, out error))
+                return false;
+            if (skipped.Contains(last))
+            {
+                error = $"--skip {Quoted(skip.First(s => TryFindStep(names, "--skip", s, out var i, out _) && i == last))}: it is the step of --to, which always runs";
+                return false;
+            }
+            skipped.RemoveWhere(i => i > last);
+        }
+        if (skipped.Count > 0 && skipped.Count == last + 1)
+        {
+            error = "--skip: every step of the workflow is skipped, nothing would run";
+            return false;
+        }
+
+        narrowed = new WorkflowDefinition
         {
             Name = workflow.Name,
             Description = workflow.Description,
             SourceFile = workflow.SourceFile,
             Endpoints = workflow.Endpoints,
             Imports = workflow.Imports,
-            Steps = workflow.Steps.Take(index + 1).ToList(),
+            Steps = to is null ? workflow.Steps : workflow.Steps.Take(last + 1).ToList(),
             Variables = workflow.Variables,
             Settings = workflow.Settings,
-            StoppedAfter = index,
-            StepsInFile = workflow.Steps.Count
+            StoppedAfter = to is null ? null : last,
+            StepsInFile = workflow.Steps.Count,
+            Skipped = skipped.ToList()
         };
         return true;
     }
+
+    /// <summary>A step by its number (1-based) or its exact name; <paramref name="option"/> names it in errors.</summary>
+    private static bool TryFindStep(List<string> names, string option, string step, out int index, out string error)
+    {
+        index = -1;
+        error = "";
+        if (int.TryParse(step, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var number))
+        {
+            if (number < 1 || number > names.Count)
+            {
+                error = $"{option} {step}: the workflow has {names.Count} step{(names.Count == 1 ? "" : "s")}";
+                return false;
+            }
+            index = number - 1;
+            return true;
+        }
+
+        var matches = names.Select((name, i) => (name, i)).Where(n => n.name == step).Select(n => n.i).ToList();
+        if (matches.Count == 0)
+        {
+            error = $"{option} \"{step}\": no step has this name{Loader.Suggest(step, names.Distinct())}";
+            return false;
+        }
+        if (matches.Count > 1)
+        {
+            error = $"{option} \"{step}\": {matches.Count} steps have this name ({string.Join(", ", matches.Select(i => i + 1))}): use the number";
+            return false;
+        }
+        index = matches[0];
+        return true;
+    }
+
+    private static string Quoted(string step) =>
+        int.TryParse(step, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out _) ? step : $"\"{step}\"";
 
     public static WorkflowDefinition LoadAny(string path)
     {

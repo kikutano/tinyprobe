@@ -5,9 +5,15 @@ using Tinyprobe.Core.Models;
 
 namespace Tinyprobe.Cli.Tests;
 
-/// <summary>The step line of the console (spec 0019: a call shows its status, not a verdict).</summary>
+/// <summary>The step lines of the console (spec 0019: a call shows its status, not a verdict; spec 0021: skipped steps).</summary>
 public sealed class ConsoleReporterTests
 {
+    private sealed class Ok : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+    }
+
     private static (ConsoleReporter Reporter, StringWriter Output) Reporter(bool call, bool unicode = true)
     {
         var output = new StringWriter();
@@ -87,5 +93,39 @@ public sealed class ConsoleReporterTests
         var lines = Text(output).Split('\n');
         Assert.StartsWith("  ✓ login", lines[0]);
         Assert.StartsWith("  ✗ login", lines[1]);
+    }
+
+    [Fact]
+    public async Task ASkippedStep_IsPrintedInItsPlace_AndCountedInTheSummary()
+    {
+        var workflow = Core.Parsing.WorkflowLoader.Parse("""
+            name: Users
+            base_url: https://api.test
+            endpoints:
+              list: { path: /users }
+              remove: { method: DELETE, path: /users/1 }
+            steps:
+              - name: First
+                call: list
+              - name: Delete the user
+                call: remove
+              - name: Last
+                call: list
+              - sleep: 1ms
+            """, "users.yaml");
+        Assert.True(Core.Parsing.WorkflowLoader.TryNarrow(workflow, null, ["2", "4"], out var narrowed, out var error), error);
+        var (reporter, output) = Reporter(call: false);
+        var engine = new Core.Execution.WorkflowEngine(new HttpClient(new Ok()));
+
+        var report = await reporter.RunAsync(engine, narrowed, new Dictionary<string, System.Text.Json.JsonElement>());
+        reporter.WriteSummary(Core.Reporting.WorkflowSummary.Create(narrowed, report), TimeSpan.FromSeconds(1));
+
+        var lines = Text(output).Split('\n').Where(l => l.StartsWith("  ✓") || l.StartsWith("  –")).Select(l => l.TrimEnd()).ToList();
+        Assert.True(lines.Count == 4, Text(output));
+        Assert.StartsWith("  ✓ First", lines[0]);
+        Assert.Matches(@"^  – Delete the user +skipped \(--skip\)$", lines[1]);
+        Assert.StartsWith("  ✓ Last", lines[2]);
+        Assert.StartsWith("  – sleep 1ms", lines[3]);
+        Assert.Contains("2/2 passed  2 skipped", Text(output));
     }
 }
