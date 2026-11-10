@@ -1,9 +1,9 @@
 # 0022 — Resume a run where it stopped
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Roadmap:** M5-10
 - **Repositories:** tinyprobe, tinyprobe-app (tinyprobe-vscode later, see the open questions)
-- **PRs:** —
+- **PRs:** [#44](https://github.com/kikutano/tinyprobe/pull/44), [tinyprobe-app#29](https://github.com/kikutano/tinyprobe-app/pull/29)
 
 ## Problem
 
@@ -106,11 +106,11 @@ No change in this task (see the out-of-scope section).
   - the steps that ran changed (tinyprobe refuses the state);
   - the environment or the switches changed;
   - the last run failed;
-  - the page was reloaded.
+  - the page was reloaded. (Implemented without a line: after a reload the page has no last run to compare with, so it simply runs from the start.)
 - **↺ From the start** is always next to the run. Use it, for example, when a token has expired because time has passed.
 - **▶ Run** runs the whole workflow from the start, as it does today.
 - **The state is kept only in the page's memory.** It is never stored in `localStorage` and never written to disk, because it holds tokens. The launcher passes it with `--resume -` and drops it after the run starts.
-- **The overview** records the outcome of the chain since the last run from the start, so "8/8 passed" covers the steps before as well.
+- **The overview** keeps showing the last whole run (▶ Run), as it does today: a run up to a step is not a whole run, continued or not. (Changed while implementing: the proposal recorded the chain of runs, but ▶ Up to here was never recorded in the overview.)
 - **Version.** The app needs the tinyprobe release with `--resume` and shows the new behavior only from that version on. With an older version, ▶ Up to here keeps running from the start.
 
 ## Validation
@@ -176,27 +176,27 @@ Nothing changes in this task. A run started with `--resume` from a terminal alre
 
 ## Acceptance criteria
 
-- [ ] `run_finished.state` after a `--to` run that passed; `null` after a whole run and after a failure.
-- [ ] `--resume <file>` and `--resume -`:
+- [x] `run_finished.state` after a `--to` run that passed; `null` after a whole run and after a failure.
+- [x] `--resume <file>` and `--resume -`:
   - restore saved values, resolved variables and cookies;
   - start at the step after the state's step;
   - respect `--to` and `--skip`;
   - give each error above.
-- [ ] The fingerprint:
+- [x] The fingerprint:
   - an edit to a later step keeps the state good;
   - an edit to a step that ran, or to an endpoint it calls, makes it refused.
-- [ ] A generated workflow variable (`${$uuid}`) has the same value before and after the resume.
-- [ ] A cookie set before the state is sent after the resume.
-- [ ] Console: the "continuing after" line and the summary.
-- [ ] ndjson: `resumed_after` and `state`.
-- [ ] Unit and CLI tests for all of the above, including a resume between two steps of a sequence.
-- [ ] `scripts/dev.sh e2e`: `users.yaml` against the test server, run with `--to` and then resumed to the end. The two runs together leave the server's data as it was.
-- [ ] tinyprobe-app:
+- [x] A generated workflow variable (`${$uuid}`) has the same value before and after the resume.
+- [x] A cookie set before the state is sent after the resume.
+- [x] Console: the "continuing after" line and the summary.
+- [x] ndjson: `resumed_after` and `state`.
+- [x] Unit and CLI tests for all of the above, including a resume between two steps of a sequence.
+- [x] `scripts/dev.sh e2e`: `users.yaml` against the test server, run with `--to` and then resumed to the end. The two runs together leave the server's data as it was.
+- [x] tinyprobe-app:
   - ▶ Up to here continues, and runs from the start with the reason in every case above;
   - ↺ From the start;
   - the state kept only in memory and passed on stdin;
   - the feature hidden with an older tinyprobe.
-- [ ] `scripts/dev.sh check` passes in both repositories, along with the performance guard.
+- [x] `scripts/dev.sh check` passes in both repositories, along with the performance guard.
 
 ## Open questions
 
