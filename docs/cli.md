@@ -66,6 +66,8 @@ Options for 'run' and 'call':
                           its number, as 'inspect' lists the steps, or its name.
   --skip <step>           ('run' only, one workflow) Leave this step out of this run, the file
                           unchanged: its number or its name, as for --to. Repeatable.
+  --resume <file | ->     ('run' only, one workflow) Continue a run cut by --to after its last
+                          step, from the "state" of its run_finished event (- reads stdin).
   -v, --verbose           Print variables, requests and responses while running.
   --no-color              Disable colors (also honored: the NO_COLOR environment variable).
 
@@ -156,7 +158,7 @@ tinyprobe call docs/example/api/testserver.yaml status --with code=404 -e docs/e
 
 `call` accepts any status, so a `404` is shown, not reported as a failure: a single call is not a test, so its line starts with `→` and the status, with no ✓ or ✗. A ✗ means that no response arrived (exit code 1). Arguments are validated like a step's `with`: a missing required param or a misspelled name is an error. A call remembers nothing for the next one ([decision 0003](decisions/0003-endpoints-declare-workflows-run.md)).
 
-To look at one step of a flow, the one that needs the token and the ids of the steps before it, run the workflow up to it with `--to`: its number, as `inspect` lists the steps, or its name. The steps before it run again, so no state is kept between runs; the steps after it don't run and aren't counted.
+To look at one step of a flow, the one that needs the token and the ids of the steps before it, run the workflow up to it with `--to`: its number, as `inspect` lists the steps, or its name. The steps before it run again; the steps after it don't run and aren't counted.
 
 ```bash
 tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml --to 3 -v
@@ -172,6 +174,16 @@ tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml --skip 
 ```
 
 The next run without `--skip` runs every step, so a step left out never stays out by mistake in CI. tinyprobe-app turns steps off with ⊘ Skip on the diagram and passes them with `--skip`.
+
+A run cut by `--to` can be continued instead of replayed, for tools that go through a flow one step at a time ([spec 0022](specs/0022-resume-a-run.md)). When every step up to the target passed, the `run_finished` event of `--reporter ndjson` has a `state`: the values saved, the workflow `variables` already resolved and the cookies. `--resume` takes it back and starts at the next step, up to `--to` or to the end:
+
+```bash
+tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml --to "Create a user" --reporter ndjson > run.ndjson
+tail -n 1 run.ndjson | jq .state > state.json
+tinyprobe run docs/example/workflows/users.yaml -e docs/environment.yaml --resume state.json --to "Patch the user"
+```
+
+The state holds tokens: keep it in memory and pass it with `--resume -` (standard input) rather than writing it to a file, and never commit it. tinyprobe refuses a state of another workflow or environment file, and one whose steps changed since it was made (the steps that ran, and the endpoints they call; an edit to a later step is fine). tinyprobe-app continues ▶ Up to here this way.
 
 ## Use tinyprobe from other tools
 

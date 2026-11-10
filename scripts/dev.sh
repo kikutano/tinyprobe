@@ -132,6 +132,19 @@ e2e() {
   jq -e -s '.[0].skipped == [1, 3] and ([.[] | select(.event == "step_started") | .index] | index(1) == null)
     and .[-1].success and .[-1].summary.skipped_steps == 2 and .[-1].summary.total_steps == 10' \
     "$DEV_DIR/skip.ndjson" > /dev/null
+  # Resume (spec 0022): up to the user's creation, then the rest from the state on stdin; the second run deletes
+  # the user the first one created, so the server's data is left as it was.
+  "$DEV_BIN" run docs/example/workflows/users.yaml -e docs/environment.yaml --var "baseUrl=$BASE_URL/" \
+    --to "Create a user" --reporter ndjson > "$DEV_DIR/resume-to.ndjson"
+  jq -e -s '.[-1].success and .[-1].state.after == .[0].to and (.[-1].state.saved | has("userId"))' \
+    "$DEV_DIR/resume-to.ndjson" > /dev/null
+  tail -n 1 "$DEV_DIR/resume-to.ndjson" | jq .state \
+    | "$DEV_BIN" run docs/example/workflows/users.yaml -e docs/environment.yaml --var "baseUrl=$BASE_URL/" \
+      --resume - --reporter ndjson > "$DEV_DIR/resume.ndjson"
+  jq -e -s --slurpfile to "$DEV_DIR/resume-to.ndjson" '.[0].resumed_after == $to[0].to
+    and ([.[] | select(.event == "step_started") | .index] | min) == $to[0].to + 1
+    and .[-1].success and .[-1].state == null and .[-1].summary.resumed_after == $to[0].to' \
+    "$DEV_DIR/resume.ndjson" > /dev/null
   echo "Protocol checks passed."
 
   step "End-to-end (schema)"

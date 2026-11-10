@@ -54,7 +54,8 @@ public static class JunitReport
         // A for_each step has one report per item: each one is a test case.
         var reports = run.Report.StepReports.GroupBy(s => s.Index).ToDictionary(g => g.Key, g => g.ToList());
         var cases = new List<CaseXml>();
-        for (int index = 0; index < run.Workflow.Steps.Count; index++)
+        // A resumed run reports its own steps: the earlier ones were in the report of the state's run.
+        for (int index = (run.Workflow.ResumedAfter ?? -1) + 1; index < run.Workflow.Steps.Count; index++)
         {
             if (run.Workflow.Steps[index] is not CallStep step)
                 continue; // sleeps are not tests

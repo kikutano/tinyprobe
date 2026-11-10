@@ -54,6 +54,17 @@ public sealed class WorkflowDefinition
     /// stays, so every other step keeps the index <c>inspect</c> gives it.
     /// </summary>
     public IReadOnlyList<int> Skipped { get; init; } = [];
+    /// <summary>
+    /// <c>run --resume</c> (spec 0022): the state of an earlier run of this workflow; the run starts at the step after
+    /// <see cref="Execution.RunState.After"/>, with its values and cookies. Null for a run from the start.
+    /// </summary>
+    public Execution.RunState? Resume { get; init; }
+    /// <summary>The index of the last step the resumed run had already run, or null.</summary>
+    public int? ResumedAfter => Resume?.After;
+    /// <summary>The steps of <see cref="Skipped"/> this run leaves out: those before a resumed run's state ran before it.</summary>
+    public IEnumerable<int> SkippedInRun => Skipped.Where(index => index > (ResumedAfter ?? -1));
+    /// <summary>Whether the step at this index is run by this run, or was run by the state's run.</summary>
+    public bool RunsStep(int index) => index > (ResumedAfter ?? -1);
     /// <summary>The file is a sequence (<c>sequence:</c>), loaded on its own by <c>inspect</c>; it cannot run.</summary>
     public bool IsSequence { get; init; }
     /// <summary>A sequence's declared params, with their default (null = required).</summary>
@@ -153,6 +164,8 @@ public abstract class StepDefinition
     public SourceLocation? SourceLocation { get; init; }
     /// <summary>The <c>use</c> that brought the step into the workflow; null for a step of the workflow.</summary>
     public SequenceUse? Sequence { get; init; }
+    /// <summary>The step as written, for the fingerprint of a run's state; null for the step of a <c>call</c>.</summary>
+    internal YamlNode? Written { get; init; }
 
     /// <summary>Where the step is written: errors about it point there.</summary>
     internal SourceLocation WrittenAt => SourceLocation ?? Location;

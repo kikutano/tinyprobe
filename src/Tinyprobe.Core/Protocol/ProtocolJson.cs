@@ -341,9 +341,10 @@ public static class ProtocolJson
         w.WriteString("file", workflow.SourceFile);
         WriteNullableNumber(w, "to", workflow.StoppedAfter);
         w.WriteStartArray("skipped");
-        foreach (var index in workflow.Skipped)
+        foreach (var index in workflow.SkippedInRun)
             w.WriteNumberValue(index);
         w.WriteEndArray();
+        WriteNullableNumber(w, "resumed_after", workflow.ResumedAfter);
         if (environmentFile is null)
             w.WriteNull("env_file");
         else
@@ -493,6 +494,12 @@ public static class ProtocolJson
         w.WriteString("event", "run_finished");
         w.WriteBoolean("success", summary.IsSuccess);
         WriteRunSummary(w, summary, elapsed);
+        // What run --resume needs to continue this run (spec 0022): only after a --to run that passed.
+        w.WritePropertyName("state");
+        if (summary.State is { } state)
+            state.Write(w);
+        else
+            w.WriteNullValue();
     });
 
     private static void WriteRunSummary(Utf8JsonWriter w, WorkflowSummary summary, TimeSpan elapsed)
@@ -504,6 +511,7 @@ public static class ProtocolJson
         w.WriteNumber("not_run_steps", summary.NotRunSteps);
         WriteNullableNumber(w, "stopped_after", summary.StoppedAfter);
         w.WriteNumber("skipped_steps", summary.SkippedSteps);
+        WriteNullableNumber(w, "resumed_after", summary.ResumedAfter);
         w.WriteNumber("checks_passed", summary.ChecksPassed);
         w.WriteNumber("checks_failed", summary.ChecksFailed);
         w.WriteNumber("http_requests", summary.HttpRequests);

@@ -99,7 +99,7 @@ The extension's own `scripts/dev.sh check` covers the gating and the command lin
 
 ## Out of scope
 
-- Running from a step (`--from`): its earlier steps' saved values would be missing, which is the hidden state decision 0003 avoids.
+- Running from a step (`--from`): its earlier steps' saved values would be missing, which is the hidden state decision 0003 avoids. Continuing a run from the state it gives is [spec 0022](0022-resume-a-run.md).
 - Running one step with the values of the last run (a cache of saved values).
 - Breakpoints, or a step-by-step mode that waits between steps.
 

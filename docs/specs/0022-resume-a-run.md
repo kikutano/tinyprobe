@@ -86,6 +86,7 @@ The state is JSON, written by tinyprobe and read back by tinyprobe. A tool keeps
 ```
 
 - **`after`** is the 0-based index of the last step that ran, as in `run_started.to`.
+- **`cookies`** keep where they are sent: a cookie whose `domain` starts with a dot (`.example.com`) is sent to subdomains too, as its `Domain` attribute asked; the others go to their host only.
 - **`steps`** is the fingerprint of steps 1 to `after+1` as tinyprobe loaded them. It covers each step's own definition and the endpoints and auth sets it calls, sequences included. Editing a later step, or anything those steps do not use, keeps the state good. This is the case of building a flow one step at a time.
 
 ### MCP
