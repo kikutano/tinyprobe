@@ -43,7 +43,7 @@ internal sealed class ConsoleReporter : IRunReporter
     public void WriteHeader(string version, string workflowPath, string? envPath,
         WorkflowDefinition workflow, IReadOnlyDictionary<string, JsonElement> environment)
     {
-        var steps = workflow.Steps.OfType<CallStep>().ToList();
+        var steps = workflow.Steps.Where((_, i) => workflow.RunsStep(i)).OfType<CallStep>().ToList();
         // A for_each step is shown with " [2/10]" after its name.
         _nameWidth = Math.Clamp(steps.Select(s => s.Name.Length + (s.ForEach is null ? 0 : 8)).DefaultIfEmpty(0).Max(), 4, MaxNameWidth);
 
@@ -60,9 +60,17 @@ internal sealed class ConsoleReporter : IRunReporter
             WriteHeaderRow("base url", baseUrl.GetString()!);
         if (!ShowResponse)
             WriteHeaderRow("steps", steps.Count.ToString(CultureInfo.InvariantCulture)
-                + (workflow.Skipped.Count > 0 ? $" ({workflow.Skipped.Count} skipped: --skip)" : ""));
+                + (workflow.SkippedInRun.Count() is > 0 and var skipped ? $" ({skipped} skipped: --skip)" : ""));
 
         _console.WriteLine();
+        if (workflow.Resume is { } state)
+        {
+            int values = state.Saved.Count + state.Variables.Count;
+            var after = workflow.Steps[state.After];
+            _console.MarkupLine($"  [grey]continuing after step {state.After + 1} ({Escape(after is CallStep call ? call.Name : ((SleepStep)after).Name)}): "
+                + $"{values} value{(values == 1 ? "" : "s")}, {state.Cookies.Count} cookie{(state.Cookies.Count == 1 ? "" : "s")}[/]");
+            _console.WriteLine();
+        }
     }
 
     /// <summary>The first line of the output, once: a suite prints it before its first workflow.</summary>
@@ -100,7 +108,7 @@ internal sealed class ConsoleReporter : IRunReporter
     {
         engine.StepCompleted += WriteStep;
         _skipped.Clear();
-        foreach (var index in workflow.Skipped)
+        foreach (var index in workflow.SkippedInRun)
             _skipped.Enqueue((index, workflow.Steps[index] is CallStep call ? call.Name : ((SleepStep)workflow.Steps[index]).Name));
 
         if (!_live)
@@ -137,6 +145,17 @@ internal sealed class ConsoleReporter : IRunReporter
         }
     }
 
+    /// <summary>Which part of the workflow the run covered: <c>(continued after step 7; stopped after step 8 of 12: --to)</c>.</summary>
+    private static string Range(WorkflowSummary summary)
+    {
+        var parts = new List<string>();
+        if (summary.ResumedAfter is { } resumed)
+            parts.Add($"continued after step {resumed + 1}");
+        if (summary.StoppedAfter is { } last)
+            parts.Add($"stopped after step {last + 1} of {summary.StepsInFile}: --to");
+        return parts.Count == 0 ? "" : $"  [grey]({string.Join("; ", parts)})[/]";
+    }
+
     public void WriteSummary(WorkflowSummary summary, TimeSpan elapsed)
     {
         _console.WriteLine();
@@ -152,7 +171,7 @@ internal sealed class ConsoleReporter : IRunReporter
             + (summary.FailedSteps > 0 ? $"  [red]{summary.FailedSteps} failed[/]" : "")
             + (summary.NotRunSteps > 0 ? $"  [yellow]{summary.NotRunSteps} not run[/]" : "")
             + (summary.SkippedSteps > 0 ? $"  [grey]{summary.SkippedSteps} skipped[/]" : "")
-            + (summary.StoppedAfter is { } last ? $"  [grey](stopped after step {last + 1} of {summary.StepsInFile}: --to)[/]" : ""));
+            + Range(summary));
 
         var rate = elapsed.TotalSeconds > 0 ? summary.HttpRequests / elapsed.TotalSeconds : 0;
         WriteMetric("http_reqs", $"{summary.HttpRequests}  [grey]{rate:0.##}/s[/]");

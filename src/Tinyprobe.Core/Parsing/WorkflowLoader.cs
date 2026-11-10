@@ -113,6 +113,78 @@ public static class WorkflowLoader
         return true;
     }
 
+    /// <summary>
+    /// <c>run --resume</c> (spec 0022): <paramref name="workflow"/>, already narrowed by <c>--to</c> and <c>--skip</c>,
+    /// continued from <paramref name="state"/>. The state must be of this file and environment file, and the steps it
+    /// ran must be the same as the ones loaded now. <paramref name="to"/> is <c>--to</c> as given, for its error.
+    /// </summary>
+    public static bool TryResume(WorkflowDefinition workflow, string? environmentFile, string? to, RunState state,
+        out WorkflowDefinition resumed, out string error)
+    {
+        resumed = workflow;
+        error = "";
+        if (!SamePath(state.File, workflow.SourceFile))
+        {
+            error = $"--resume: the state is of {Shown(state.File)}, not {Shown(workflow.SourceFile)}";
+            return false;
+        }
+        var env = environmentFile is null ? null : Path.GetFullPath(environmentFile);
+        if (!SamePath(state.EnvFile, env))
+        {
+            error = state.EnvFile is null
+                ? $"--resume: the state was made without -e: run from the start to use {Shown(env!)}"
+                : $"--resume: the state was made with -e {Shown(state.EnvFile)}: run from the start to use "
+                    + (env is null ? "no environment file" : Shown(env));
+            return false;
+        }
+        int inFile = workflow.StoppedAfter is null ? workflow.Steps.Count : workflow.StepsInFile;
+        if (state.After < 0 || state.After >= inFile - 1)
+        {
+            error = state.After < 0 || state.After >= inFile
+                ? $"--resume: the steps up to step {state.After + 1} changed since the state was made: run from the start"
+                : "--resume: the state is after the last step, nothing is left to run";
+            return false;
+        }
+        if (workflow.StoppedAfter is { } last && last <= state.After)
+        {
+            error = $"--to {Quoted(to!)}: the state already ran steps 1 to {state.After + 1}: --to must come after step {state.After + 1}";
+            return false;
+        }
+        if (RunState.Fingerprint(workflow, state.After) != state.Steps)
+        {
+            error = $"--resume: the steps up to step {state.After + 1} changed since the state was made: run from the start";
+            return false;
+        }
+        if (Enumerable.Range(state.After + 1, workflow.Steps.Count - state.After - 1).All(workflow.Skipped.Contains))
+        {
+            error = $"--skip: every step after step {state.After + 1} is skipped, nothing would run";
+            return false;
+        }
+
+        resumed = new WorkflowDefinition
+        {
+            Name = workflow.Name,
+            Description = workflow.Description,
+            SourceFile = workflow.SourceFile,
+            Endpoints = workflow.Endpoints,
+            Imports = workflow.Imports,
+            Steps = workflow.Steps,
+            Variables = workflow.Variables,
+            Settings = workflow.Settings,
+            StoppedAfter = workflow.StoppedAfter,
+            StepsInFile = workflow.StepsInFile == 0 ? workflow.Steps.Count : workflow.StepsInFile,
+            Skipped = workflow.Skipped,
+            Resume = state
+        };
+        return true;
+
+        static bool SamePath(string? a, string? b) =>
+            a is null || b is null ? a == b
+                : string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+
+        static string Shown(string path) => Path.GetRelativePath(Environment.CurrentDirectory, path);
+    }
+
     /// <summary>A step by its number (1-based) or its exact name; <paramref name="option"/> names it in errors.</summary>
     private static bool TryFindStep(List<string> names, string option, string step, out int index, out string error)
     {
@@ -1004,7 +1076,7 @@ internal sealed partial class Loader
                 if (Scalar(file, sleepNode, "sleep") is { } text)
                 {
                     if (Durations.TryParse(text, out var duration))
-                        steps.Add(new SleepStep { Duration = duration, Location = location, SourceLocation = sourceLocation, Sequence = sequence });
+                        steps.Add(new SleepStep { Duration = duration, Location = location, SourceLocation = sourceLocation, Sequence = sequence, Written = item });
                     else
                         Error(file, sleepNode, $"invalid duration '{text}': use e.g. 500ms, 2s or 1m");
                 }
@@ -1058,7 +1130,8 @@ internal sealed partial class Loader
                 Until = entries.TryGetValue("until", out var untilNode) ? ParseUntil(file, untilNode) : null,
                 Location = location,
                 SourceLocation = sourceLocation,
-                Sequence = sequence
+                Sequence = sequence,
+                Written = item
             });
         }
 

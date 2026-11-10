@@ -5,7 +5,7 @@ using Tinyprobe.Core.Models;
 
 namespace Tinyprobe.Cli.Tests;
 
-/// <summary>The step lines of the console (spec 0019: a call shows its status, not a verdict; spec 0021: skipped steps).</summary>
+/// <summary>The step lines of the console (spec 0019: a call shows its status, not a verdict; spec 0021: skipped steps; spec 0022: a resumed run).</summary>
 public sealed class ConsoleReporterTests
 {
     private sealed class Ok : HttpMessageHandler
@@ -127,5 +127,50 @@ public sealed class ConsoleReporterTests
         Assert.StartsWith("  ✓ Last", lines[2]);
         Assert.StartsWith("  – sleep 1ms", lines[3]);
         Assert.Contains("2/2 passed  2 skipped", Text(output));
+    }
+
+    [Fact]
+    public async Task AResumedRun_SaysWhereItContinues_AndCountsOnlyItsSteps()
+    {
+        var path = Path.Combine(Directory.CreateTempSubdirectory("tinyprobe-console-").FullName, "users.yaml");
+        File.WriteAllText(path, """
+            name: Users
+            base_url: https://api.test
+            endpoints:
+              list: { path: /users }
+            steps:
+              - name: First
+                call: list
+                save: { total: $.total }
+              - name: Second
+                call: list
+              - name: Third
+                call: list
+              - name: Last
+                call: list
+            """);
+        var workflow = Core.Parsing.WorkflowLoader.Load(path);
+        Assert.True(Core.Parsing.WorkflowLoader.TryNarrow(workflow, "3", [], out var narrowed, out var error), error);
+        var state = new Core.Execution.RunState
+        {
+            File = path,
+            After = 0,
+            Steps = Core.Execution.RunState.Fingerprint(workflow, 0),
+            Saved = [new("total", System.Text.Json.JsonDocument.Parse("3").RootElement)],
+            Cookies = [new Cookie("session", "abc", "/", "api.test")]
+        };
+        Assert.True(Core.Parsing.WorkflowLoader.TryResume(narrowed, null, "3", state, out var resumed, out error), error);
+        var (reporter, output) = Reporter(call: false);
+
+        reporter.WriteHeader("1.2.3", path, null, resumed, new Dictionary<string, System.Text.Json.JsonElement>());
+        var report = await reporter.RunAsync(new Core.Execution.WorkflowEngine(new HttpClient(new Ok())), resumed, new Dictionary<string, System.Text.Json.JsonElement>());
+        reporter.WriteSummary(Core.Reporting.WorkflowSummary.Create(resumed, report), TimeSpan.FromSeconds(1));
+
+        var text = Text(output);
+        Assert.Contains("  continuing after step 1 (First): 1 value, 1 cookie\n", text);
+        Assert.Matches(@"steps\s*:\s*2\n", text);
+        Assert.DoesNotContain("✓ First", text);
+        Assert.Contains("✓ Second", text);
+        Assert.Contains("2/2 passed  (continued after step 1; stopped after step 3 of 4: --to)", text);
     }
 }

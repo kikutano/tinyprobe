@@ -59,6 +59,9 @@ public sealed class WorkflowEngine
     /// <summary>Record the request and response of every call in <see cref="StepReport.Request"/> and <see cref="StepReport.Response"/>.</summary>
     public bool RecordExchanges { get; set; }
 
+    /// <summary>The environment file of the run (<c>-e</c>), named in the state of a run cut by <c>--to</c>.</summary>
+    public string? EnvironmentFile { get; set; }
+
     /// <summary>When set, multipart bodies may send only files inside this directory: set by the MCP server, for its workspace.</summary>
     public string? FileRoot { get; set; }
 
@@ -80,7 +83,22 @@ public sealed class WorkflowEngine
 
         _savedBySkipped.Clear();
         var skipped = workflow.Skipped.ToHashSet();
-        for (int index = 0; index < workflow.Steps.Count; index++)
+        int first = 0;
+        if (workflow.Resume is { } resume)
+        {
+            // run --resume (spec 0022): the steps up to the state's ran in its run; this one goes on from there.
+            globals.Restore(resume);
+            resume.RestoreCookies(_cookies);
+            first = resume.After + 1;
+            foreach (var index in workflow.Skipped.Where(i => i < first))
+            {
+                if (workflow.Steps[index] is CallStep left)
+                    foreach (var name in left.Save.Keys)
+                        _savedBySkipped[name] = (index, left.Name);
+            }
+            _log.WriteLine($"Continuing after step {first}");
+        }
+        for (int index = first; index < workflow.Steps.Count; index++)
         {
             // A skipped step sends no event and leaves no report: run_started lists it (spec 0021).
             if (skipped.Contains(index))
@@ -125,6 +143,21 @@ public sealed class WorkflowEngine
                 _log.WriteLine($"Step '{call.Name}' failed. Stopping workflow execution.");
                 break;
             }
+        }
+
+        // A run cut by --to that passed can be continued: run_finished gives its state.
+        if (workflow.StoppedAfter is { } last && last < workflow.StepsInFile - 1 && report.StepReports.All(s => s.IsSuccess))
+        {
+            report.State = new RunState
+            {
+                File = workflow.SourceFile,
+                EnvFile = EnvironmentFile is null ? null : Path.GetFullPath(EnvironmentFile),
+                After = last,
+                Steps = RunState.Fingerprint(workflow, last),
+                Saved = globals.Saved,
+                Variables = globals.ResolvedDefaults,
+                Cookies = RunState.CookiesOf(_cookies)
+            };
         }
 
         return report;

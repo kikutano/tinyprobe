@@ -47,6 +47,8 @@ const string Usage = """
                               its number, as 'inspect' lists the steps, or its name.
       --skip <step>           ('run' only, one workflow) Leave this step out of this run, the file
                               unchanged: its number or its name, as for --to. Repeatable.
+      --resume <file | ->     ('run' only, one workflow) Continue a run cut by --to after its last
+                              step, from the "state" of its run_finished event (- reads stdin).
       -v, --verbose           Print variables, requests and responses while running.
       --no-color              Disable colors (also honored: the NO_COLOR environment variable).
 
@@ -173,6 +175,7 @@ var positional = new List<string>();
 string? envFilePath = null;
 string? junitPath = null;
 string? stopAfter = null;
+string? resumeFrom = null;
 var skip = new List<string>();
 string reporterName = "console";
 bool verbose = false, noColor = false, json = false, source = false;
@@ -199,11 +202,11 @@ for (int i = 1; i < args.Length; i++)
         case "-v" or "--verbose" when command != "inspect":
             verbose = true;
             break;
-        case "--junit" or "--to" or "--skip" when command == "call":
+        case "--junit" or "--to" or "--skip" or "--resume" when command == "call":
             return UsageError($"Option '{option}' is not available for 'call'.");
         case "-e" or "--env" or "--reporter" or "--var" when command != "inspect":
         case "--with" when command == "call":
-        case "--junit" or "--to" or "--skip" when command == "run":
+        case "--junit" or "--to" or "--skip" or "--resume" when command == "run":
             if (i + 1 >= args.Length)
                 return UsageError($"Option '{option}' requires a value.");
             var value = args[++i];
@@ -220,6 +223,9 @@ for (int i = 1; i < args.Length; i++)
                     break;
                 case "--skip":
                     skip.Add(value);
+                    break;
+                case "--resume":
+                    resumeFrom = value;
                     break;
                 case "--reporter":
                     if (value is not ("console" or "ndjson"))
@@ -261,6 +267,8 @@ if (suite && stopAfter is not null)
 // A step's number means a different step in each file.
 if (suite && skip.Count > 0)
     return UsageError("--skip applies to one workflow file, not a folder or several files.");
+if (suite && resumeFrom is not null)
+    return UsageError("--resume applies to one workflow file, not a folder or several files.");
 IReadOnlyList<string> suiteFiles = [];
 if (suite)
 {
@@ -311,6 +319,26 @@ try
             if (!WorkflowLoader.TryNarrow(workflow, stopAfter, skip, out var narrowed, out var stepError))
                 return UsageError(stepError);
             workflow = narrowed;
+        }
+        // Continue a run cut by --to from its state (spec 0022); "-" reads it from stdin, so it is never in a file.
+        if (resumeFrom is not null)
+        {
+            RunState state;
+            try
+            {
+                state = RunState.Parse(resumeFrom == "-" ? Console.In.ReadToEnd() : File.ReadAllText(resumeFrom));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return UsageError($"--resume: cannot read {resumeFrom}: {ex.Message}");
+            }
+            catch (RunStateException ex)
+            {
+                return UsageError(ex.Message);
+            }
+            if (!WorkflowLoader.TryResume(workflow, envFilePath, stopAfter, state, out var resumed, out var resumeError))
+                return UsageError(resumeError);
+            workflow = resumed;
         }
     }
     if (envFilePath is not null)
@@ -365,7 +393,8 @@ var cookies = new CookieContainer();
 using var httpClient = new HttpClient(CreateHandler(cookies)) { Timeout = TimeSpan.FromSeconds(workflow!.Settings.Timeout) };
 var engine = new WorkflowEngine(httpClient, log, cookies)
 {
-    RecordExchanges = reporterName == "ndjson" || command == "call"
+    RecordExchanges = reporterName == "ndjson" || command == "call",
+    EnvironmentFile = envFilePath
 };
 
 reporter.WriteHeader(GetVersion(), filePath, envFilePath, workflow, environment);

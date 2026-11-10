@@ -24,6 +24,21 @@ internal sealed class GlobalVariables(
 
     public void Save(string name, JsonElement value) => _saved[name] = value;
 
+    /// <summary>The values saved so far, for the state of a run (spec 0022).</summary>
+    public IReadOnlyList<KeyValuePair<string, JsonElement>> Saved => _saved.ToList();
+
+    /// <summary>The defaults resolved so far: a generated value must stay the same in a resumed run.</summary>
+    public IReadOnlyList<KeyValuePair<string, JsonElement>> ResolvedDefaults => _resolvedDefaults.ToList();
+
+    /// <summary><c>run --resume</c>: the values of the state's run. A default of the state keeps its value.</summary>
+    public void Restore(RunState state)
+    {
+        foreach (var (name, value) in state.Saved)
+            _saved[name] = value;
+        foreach (var (name, value) in state.Variables)
+            _resolvedDefaults[name] = value;
+    }
+
     public bool TryGet(string name, out JsonElement value)
     {
         if (_saved.TryGetValue(name, out value) || environment.TryGetValue(name, out value))

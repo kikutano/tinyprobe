@@ -70,6 +70,9 @@ public sealed class RecordedResponse
 
 public class WorkflowReport
 {
+    /// <summary>A run cut by <c>--to</c> in which every step passed: what <c>run --resume</c> needs to continue it (spec 0022).</summary>
+    public Execution.RunState? State { get; set; }
+
     public string WorkflowName { get; set; } = string.Empty;
     public List<StepReport> StepReports { get; set; } = new List<StepReport>();
 }
