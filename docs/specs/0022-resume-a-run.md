@@ -1,6 +1,6 @@
 # 0022 — Resume a run where it stopped
 
-- **Status:** Draft
+- **Status:** Approved
 - **Roadmap:** M5-10
 - **Repositories:** tinyprobe, tinyprobe-app (tinyprobe-vscode later, see the open questions)
 - **PRs:** —
@@ -209,3 +209,13 @@ Nothing changes in this task. A run started with `--resume` from a terminal alre
 3. **The option's name.** `--resume <file>` reads as "carry on". `--from-state` is more literal, and `--continue` is close to `continue` in other tools. *Recommendation: `--resume`.*
 4. **When `run_finished` has a state.** The proposal gives it only after a `--to` run that passed, which keeps ndjson small and CI logs clean. The alternative gives it after every run. *Recommendation: only after `--to` that passed.*
 5. **The extension.** ▶ Run to here could continue in the same way, with the state kept in the extension's memory. Doing it in this task means three releases at once. *Recommendation: CLI and app in this task; the extension in a follow-up task, next to M5-9.*
+
+## Decisions
+
+Approved on 2026-11-10 with the recommendations:
+
+1. Decision 0003 changes: a run may continue from the state of the same workflow, kept by the caller and checked against the steps that made it. A note goes in 0003.
+2. The fingerprint covers the steps that ran and what they call, not every loaded file.
+3. The option is `--resume`.
+4. `run_finished` has a state only after a `--to` run that passed.
+5. CLI and app in this task; the extension in a follow-up task.
