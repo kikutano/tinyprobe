@@ -103,6 +103,11 @@ public sealed record EndpointDefinition
     public OAuth2ClientCredentials? OAuth2 { get; init; }
     /// <summary>Declared params with their default (null = required), or null when the endpoint declares none.</summary>
     public IReadOnlyDictionary<string, Template?>? Params { get; init; }
+    /// <summary>
+    /// Global variables (spec 0023): values of a 2xx response saved as global variables, read by the next single
+    /// calls. Used only when a globals file is given (<c>--globals</c>); otherwise ignored.
+    /// </summary>
+    public IReadOnlyDictionary<string, SaveSource> Globals { get; init; } = new Dictionary<string, SaveSource>();
     public required SourceLocation Location { get; init; }
 }
 

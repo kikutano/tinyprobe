@@ -60,6 +60,9 @@ Options for 'run' and 'call':
   -e, --env <file>        Environment file (YAML) with initial variables, e.g. baseUrl, apiKey.
   --var <name=value>      Set a variable, over the environment file. Repeatable.
   --with <name=value>     ('call' only) An argument of the endpoint, like a step's 'with'. Repeatable.
+  --globals <file>        Global variables, kept in this JSON file between calls. Read as variables (over
+                          the environment file, under --var); the 'globals' of the endpoints called are saved
+                          to it after each 2xx response. Without it, 'globals' keys are ignored.
   --reporter <name>       console (default) or ndjson: one JSON event per line, for tools.
   --junit <file>          ('run' only) Also write a JUnit XML report, for CI servers.
   --to <step>             ('run' only, one workflow) Run up to this step, included, and stop:
@@ -156,7 +159,22 @@ tinyprobe call docs/example/api/testserver.yaml status --with code=404 -e docs/e
   ...
 ```
 
-`call` accepts any status, so a `404` is shown, not reported as a failure: a single call is not a test, so its line starts with `→` and the status, with no ✓ or ✗. A ✗ means that no response arrived (exit code 1). Arguments are validated like a step's `with`: a missing required param or a misspelled name is an error. A call remembers nothing for the next one ([decision 0003](decisions/0003-endpoints-declare-workflows-run.md)).
+`call` accepts any status, so a `404` is shown, not reported as a failure: a single call is not a test, so its line starts with `→` and the status, with no ✓ or ✗. A ✗ means that no response arrived (exit code 1). Arguments are validated like a step's `with`: a missing required param or a misspelled name is an error. A call remembers nothing for the next one ([decision 0003](decisions/0003-endpoints-declare-workflows-run.md)), unless you give it a file of global variables.
+
+**Global variables** ([spec 0023](specs/0023-global-variables.md)): an endpoint that declares `globals` saves values of its 2xx responses (a token) in the file of `--globals`, and the next calls read them. Log in once, then call what needs the token:
+
+```bash
+tinyprobe call docs/example/api/testserver.yaml login --with password=password -e docs/environment.yaml --globals globals.local.json
+tinyprobe call docs/example/api/testserver.yaml me -e docs/environment.yaml --globals globals.local.json
+```
+
+```text
+  → login  POST   200    64.71ms  /api/login
+  ...
+      ✓ global token = tinyprobe-test-token
+```
+
+The file is JSON (`{ "token": { "value": "…", "from": "login", "at": "…" } }`) and holds credentials: keep it out of Git. Without `--globals`, nothing is read or saved. See [Global variables](workflow-format.md#global-variables).
 
 To look at one step of a flow, the one that needs the token and the ids of the steps before it, run the workflow up to it with `--to`: its number, as `inspect` lists the steps, or its name. The steps before it run again; the steps after it don't run and aren't counted.
 

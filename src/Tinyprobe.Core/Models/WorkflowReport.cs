@@ -31,6 +31,10 @@ public class StepReport
     public int Attempts { get; set; } = 1;
     /// <summary>The values stored by <c>save</c>, in order.</summary>
     public List<KeyValuePair<string, JsonElement>> Saved { get; set; } = new();
+    /// <summary>Global variables (spec 0023): the endpoint's <c>globals</c> saved from this response, in order.</summary>
+    public List<KeyValuePair<string, JsonElement>> Globals { get; set; } = new();
+    /// <summary>The endpoint's <c>globals</c> not found in this 2xx response, with the reason.</summary>
+    public List<string> GlobalsMissing { get; set; } = new();
     /// <summary>The request sent (last attempt); recorded only when the engine captures exchanges.</summary>
     public RecordedRequest? Request { get; set; }
     /// <summary>The response received (last attempt); recorded only when the engine captures exchanges.</summary>

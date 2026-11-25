@@ -9,7 +9,7 @@ Two kinds of file:
 | **API file** | endpoints with their parameters, base URL, auth header sets | any number of workflows |
 | **Workflow file** | steps that `call` endpoints `with` arguments, and what they `expect` and `save` | — |
 
-An API file is declarative: it has no checks and no `save`, and `tinyprobe call` of one endpoint remembers nothing for the next call. Everything that runs and every value passed from one request to the next is in a workflow ([decision 0003](decisions/0003-endpoints-declare-workflows-run.md)).
+An API file is declarative: it has no checks and no `save`, and `tinyprobe call` of one endpoint remembers nothing for the next call. Everything that runs and every value passed from one request to the next is in a workflow ([decision 0003](decisions/0003-endpoints-declare-workflows-run.md)). The one exception is opt-in, for calling endpoints by hand: [global variables](#global-variables), saved in a file you name with `--globals`.
 
 ```text
 docs/example/
@@ -69,6 +69,7 @@ endpoints:
 | `endpoints.<name>.form` | A form body (`application/x-www-form-urlencoded`), instead of `body`. See [Forms and file uploads](#forms-and-file-uploads). |
 | `endpoints.<name>.multipart` | A `multipart/form-data` body with text fields and files, instead of `body`. See [Forms and file uploads](#forms-and-file-uploads). |
 | `endpoints.<name>.params` | Optional declaration of the arguments: `name: default`, or `name:` for a required one. Declared params are checked before the request is sent. |
+| `endpoints.<name>.globals` | Values of a 2xx response saved as [global variables](#global-variables) for the next calls, `variable: <JSONPath>` or `variable: { cookie: name }`. Used only with `--globals`. |
 
 ### Auth sets
 
@@ -258,7 +259,7 @@ steps:
 Endpoints behave like functions:
 
 - **Declared `params` are local.** They come from the step's `with` or from their default, never from global variables. A required param that the step does not pass is an error.
-- **Any other placeholder** (for example `${token}` in an auth set) is resolved, from the highest priority, from: the step's `with`, values stored with `save` by earlier steps, the environment file (`-e`), the workflow's `variables`.
+- **Any other placeholder** (for example `${token}` in an auth set) is resolved, from the highest priority, from: the step's `with`, values stored with `save` by earlier steps, `--var`, the [global variables](#global-variables) of `--globals`, the environment file (`-e`), the workflow's `variables`.
 
 So a step can override a saved value for itself only, without changing it for the next steps:
 
@@ -274,6 +275,42 @@ So a step can override a saved value for itself only, without changing it for th
 An undefined variable fails the step before the request is sent.
 
 **Types in bodies.** A value that is a single placeholder keeps the argument's type: with `active: ${active}` and `with: { active: false }` the JSON is `"active": false`, not `"active": "false"`. Placeholders inside a longer text produce strings. In `with`, plain YAML scalars keep their type (`true`, `42`, `null`); quote them to send a string (`zipCode: "70100"`).
+
+## Global variables
+
+`tinyprobe call` remembers nothing, so an endpoint that needs a token would need a workflow that logs in first. Instead, an endpoint can save values of its response as **global variables**, in a JSON file that the caller names with `--globals`. The next calls read them like variables: log in once, then call the endpoints that need the token as often as you like.
+
+```yaml
+# file: api/profile.yaml
+base_url: https://api.example.com
+auth:
+  bearer:
+    Authorization: "Bearer ${token}"
+endpoints:
+  login:
+    method: POST
+    path: /login
+    params: { username: admin, password: }
+    body: { username: "${username}", password: "${password}" }
+    globals:
+      token: $.access_token     # saved after each 2xx response of login
+  me:
+    path: /me
+    auth: bearer                # ${token}: the global variable saved by login
+```
+
+```sh
+tinyprobe call api/profile.yaml login --with password=secret --globals globals.local.json
+tinyprobe call api/profile.yaml me --globals globals.local.json
+```
+
+- `globals` maps a variable to a JSONPath of the response body, or to `{ cookie: name }`, like `save`.
+- A value is saved only after a **2xx response**: a failed login does not replace a good token. One missing from the response is reported (`! global token: $.access_token not found in the response`, `globals_missing` in the ndjson events) and the call itself does not fail.
+- The file is JSON, with the endpoint that saved each value and when (UTC): `{ "token": { "value": "eyJ…", "from": "login", "at": "2026-11-25T10:12:00Z" } }`. Edit it by hand if you like; a plain `"token": "abc"` is read too. It holds credentials: keep it out of Git (`tinyprobe init` adds `globals.local.json` to `.gitignore`).
+- Global variables come over the environment file, under `--var` and a step's `with`.
+- An endpoint that uses a global variable not saved yet fails with what to call: `Variable 'token' is not defined: call 'login' first, it saves it as a global variable.`
+- **Without `--globals`, the `globals` keys are ignored.** Workflows start from zero and pass values with `save`, in CI too ([decision 0003](decisions/0003-endpoints-declare-workflows-run.md)). `tinyprobe run --globals <file>` lets a run read the file and save the globals of the endpoints it calls: for trying things by hand, not for CI, since the result then depends on calls made before.
+- tinyprobe-app passes `--globals` to every single call, with `globals.local.json` in the folder it opened, and shows what each endpoint saves and uses.
 
 ## Polling with `until`
 

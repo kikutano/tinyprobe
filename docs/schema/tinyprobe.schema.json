@@ -160,6 +160,20 @@
         "params": {
           "description": "The arguments of the endpoint, `name: default`, or `name:` for a required one. Steps pass them in `with`; they never come from global variables.",
           "type": "object"
+        },
+        "globals": {
+          "description": "Values of a 2xx response saved as global variables for the next single calls, `variable: <JSONPath>` or `variable: { cookie: name }`. Used only with `--globals <file>`.",
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/save_cookie"
+              }
+            ]
+          }
         }
       },
       "additionalProperties": false

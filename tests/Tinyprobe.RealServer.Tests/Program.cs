@@ -203,6 +203,34 @@ app.MapGet("/api/auth/bearer", (HttpRequest request) =>
 });
 
 // -----------------------------------------------------------------------------
+// GET /api/me
+// The logged in user (the token of /api/login): global variables, spec 0023.
+// -----------------------------------------------------------------------------
+
+app.MapGet("/api/me", (HttpRequest request) =>
+{
+    if (!IsBearerAuthenticated(request))
+    {
+        return Results.Json(
+            new
+            {
+                error = "unauthorized",
+                message = "Missing or invalid Bearer token."
+            },
+            statusCode: StatusCodes.Status401Unauthorized);
+    }
+
+    return Results.Ok(new
+    {
+        id = 999,
+        username = "admin",
+        name = "Ada Admin",
+        email = "admin@example.com",
+        roles = new[] { "admin", "user" }
+    });
+});
+
+// -----------------------------------------------------------------------------
 // GET /api/auth/apikey
 // Tests API key authentication
 // -----------------------------------------------------------------------------
