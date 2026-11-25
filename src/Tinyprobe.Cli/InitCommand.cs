@@ -10,7 +10,8 @@ internal static class InitCommand
 {
     public const string DefaultBaseUrl = "http://localhost:8080";
 
-    private static readonly string[] IgnoredLines = ["tinyprobe/env.*.yaml", "!tinyprobe/env.example.yaml"];
+    // globals.local.json: the global variables saved by single calls (spec 0023), tokens included, wherever it is.
+    private static readonly string[] IgnoredLines = ["tinyprobe/env.*.yaml", "!tinyprobe/env.example.yaml", "globals.local.json"];
 
     /// <summary>The sentence agents need; a file that already contains it is left as it is.</summary>
     private const string GuideMention = "tinyprobe guide";

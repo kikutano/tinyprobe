@@ -255,6 +255,12 @@ internal sealed class ConsoleReporter : IRunReporter
         if (ShowResponse && step.Response is { } response)
             WriteResponse(response);
 
+        // Global variables (spec 0023): what the call saved for the next calls, and what it could not find.
+        foreach (var (global, value) in step.Globals)
+            _console.MarkupLine($"      [cyan]{_pass} global {Escape(global)}[/] [grey]= {Escape(value.ValueKind == JsonValueKind.String ? value.GetString()! : value.GetRawText())}[/]");
+        foreach (var missing in step.GlobalsMissing)
+            _console.MarkupLine($"      [yellow]! global {Escape(missing)}[/]");
+
         if (step.IsSuccess)
             return;
 

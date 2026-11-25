@@ -38,6 +38,8 @@ public sealed class WorkflowEngine
     private OAuth2Tokens? _tokens;
     /// <summary><c>run --skip</c>: each value a skipped step saves, with that step, to say why a later step lacks it.</summary>
     private readonly Dictionary<string, (int Index, string Name)> _savedBySkipped = [];
+    // Global variables (spec 0023): which endpoint saves each one, to say what to call when one is missing.
+    private readonly Dictionary<string, string> _globalKeepers = [];
 
     /// <summary>Raised before each step runs, and again before each new attempt of an <c>until</c> step.</summary>
     public event Action<StepProgress>? StepStarted;
@@ -62,6 +64,12 @@ public sealed class WorkflowEngine
     /// <summary>The environment file of the run (<c>-e</c>), named in the state of a run cut by <c>--to</c>.</summary>
     public string? EnvironmentFile { get; set; }
 
+    /// <summary>
+    /// Global variables (spec 0023): save the <c>globals</c> of each endpoint from its 2xx responses
+    /// (<see cref="StepReport.Globals"/>), also for the next steps of the run. Set with <c>--globals</c>.
+    /// </summary>
+    public bool SaveGlobals { get; set; }
+
     /// <summary>When set, multipart bodies may send only files inside this directory: set by the MCP server, for its workspace.</summary>
     public string? FileRoot { get; set; }
 
@@ -82,6 +90,13 @@ public sealed class WorkflowEngine
         _log.WriteLine($"Executing workflow: {workflow.Name}");
 
         _savedBySkipped.Clear();
+        _globalKeepers.Clear();
+        if (SaveGlobals)
+        {
+            foreach (var endpoint in workflow.Endpoints.Values)
+                foreach (var name in endpoint.Globals.Keys)
+                    _globalKeepers.TryAdd(name, endpoint.Name);
+        }
         var skipped = workflow.Skipped.ToHashSet();
         int first = 0;
         if (workflow.Resume is { } resume)
@@ -554,6 +569,51 @@ public sealed class WorkflowEngine
                 report.Saved.Add(new(name, saved));
                 _log.WriteLine($"Saved {name} = {JsonValues.ToDisplay(saved)}");
             }
+
+            // A failed call (a wrong password) must not replace a good token: only a 2xx response is kept.
+            if (SaveGlobals && status is >= 200 and <= 299 && step.Endpoint.Globals.Count > 0)
+            {
+                using var parsed = json is null ? TryParseJson(bodyBytes) : null;
+                SaveEndpointGlobals(step.Endpoint, response, (json ?? parsed)?.RootElement, globals, report);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Global variables (spec 0023): the endpoint's <c>globals</c> read from a 2xx response. One missing from
+    /// the response is reported and does not fail the step: the call itself went well.
+    /// </summary>
+    private void SaveEndpointGlobals(
+        EndpointDefinition endpoint, HttpResponseMessage response, JsonElement? body, GlobalVariables globals, StepReport report)
+    {
+        foreach (var (name, source) in endpoint.Globals)
+        {
+            JsonElement value;
+            if (source.Cookie is { } cookie)
+            {
+                if (CookieValue(response, cookie) is not { } cookieValue)
+                {
+                    report.GlobalsMissing.Add($"{name}: no cookie '{cookie}' after this response");
+                    continue;
+                }
+                value = JsonValues.FromString(cookieValue);
+            }
+            else if (body is { } root && JsonPath.TrySelect(root, source.Path!, out var found))
+            {
+                value = found.Clone();
+            }
+            else
+            {
+                report.GlobalsMissing.Add(body is null
+                    ? $"{name}: the response body is not JSON"
+                    : $"{name}: {source.Path} not found in the response");
+                continue;
+            }
+
+            // The next steps of this run see it too, like a saved value.
+            globals.Save(name, value);
+            report.Globals.Add(new(name, value));
+            _log.WriteLine($"Saved global {name} = {JsonValues.ToDisplay(value)}");
         }
     }
 
@@ -621,10 +681,14 @@ public sealed class WorkflowEngine
             : null;
 
     /// <summary>The message of a failure; a value missing because the step that saves it was skipped says so.</summary>
-    private string Explain(Exception ex) =>
-        ex is UndefinedVariableException undefined && _savedBySkipped.TryGetValue(undefined.Name, out var by)
-            ? $"Variable '{undefined.Name}' is not defined: step {by.Index + 1} ({by.Name}), which saves it, was skipped."
-            : ex.Message;
+    private string Explain(Exception ex) => ex switch
+    {
+        UndefinedVariableException undefined when _savedBySkipped.TryGetValue(undefined.Name, out var by) =>
+            $"Variable '{undefined.Name}' is not defined: step {by.Index + 1} ({by.Name}), which saves it, was skipped.",
+        UndefinedVariableException undefined when _globalKeepers.TryGetValue(undefined.Name, out var keeper) =>
+            $"Variable '{undefined.Name}' is not defined: call '{keeper}' first, it saves it as a global variable.",
+        _ => ex.Message
+    };
 
     private void Fail(StepReport report, string reason)
     {

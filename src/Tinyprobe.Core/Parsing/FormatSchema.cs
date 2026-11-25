@@ -49,6 +49,7 @@ public static class FormatSchema
         ["endpoint.form"] = "An `application/x-www-form-urlencoded` body, `field: value`, encoded by tinyprobe. A list sends the field once per value. Instead of `body`.",
         ["endpoint.multipart"] = "A `multipart/form-data` body (file uploads), `field: value` or `field: { file: path }`. A list sends the field once per item. Instead of `body`.",
         ["endpoint.params"] = "The arguments of the endpoint, `name: default`, or `name:` for a required one. Steps pass them in `with`; they never come from global variables.",
+        ["endpoint.globals"] = "Values of a 2xx response saved as global variables for the next single calls, `variable: <JSONPath>` or `variable: { cookie: name }`. Used only with `--globals <file>`.",
 
         // multipart file
         ["multipart_file.file"] = "The path of the file to send, relative to the file tinyprobe was given (the workflow, or the API file of a `call`). May be a placeholder.",
@@ -354,7 +355,7 @@ public static class FormatSchema
             case "file.variables" or "step.with" or "endpoint.params" or "file.params":
                 w.WriteString("type", "object");
                 break;
-            case "step.save":
+            case "step.save" or "endpoint.globals":
                 MapOf(w, () =>
                 {
                     w.WriteStartArray("anyOf");

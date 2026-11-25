@@ -42,6 +42,13 @@ endpoints:
     body:
       username: ${username}
       password: ${password}
+    globals:                    # saved for the next single calls (--globals)
+      token: $.access_token
+
+  # The logged in user, with the token login saves as a global variable.
+  me:
+    path: /api/me
+    auth: bearer
 
   basic_check:
     path: /api/auth/basic

@@ -157,6 +157,15 @@ public static class ProtocolJson
 
         WriteParams(w, endpoint.Params ?? new Dictionary<string, Template?>());
 
+        // Global variables (spec 0023): written only when there are some, so other outputs stay as they were.
+        if (endpoint.Globals.Count > 0)
+        {
+            w.WriteStartObject("globals");
+            foreach (var (name, source) in endpoint.Globals)
+                w.WriteString(name, source.ToString());
+            w.WriteEndObject();
+        }
+
         w.WriteStartArray("arguments");
         foreach (var name in Loader.EndpointArguments(endpoint))
             w.WriteStringValue(name);
@@ -455,6 +464,25 @@ public static class ProtocolJson
             value.WriteTo(w);
         }
         w.WriteEndObject();
+
+        // Global variables (spec 0023): written only when there are some, so other outputs stay as they were.
+        if (step.Globals.Count > 0)
+        {
+            w.WriteStartObject("globals");
+            foreach (var (name, value) in step.Globals)
+            {
+                w.WritePropertyName(name);
+                value.WriteTo(w);
+            }
+            w.WriteEndObject();
+        }
+        if (step.GlobalsMissing.Count > 0)
+        {
+            w.WriteStartArray("globals_missing");
+            foreach (var message in step.GlobalsMissing)
+                w.WriteStringValue(message);
+            w.WriteEndArray();
+        }
 
         if (!exchange)
             return;

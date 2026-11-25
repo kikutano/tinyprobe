@@ -254,7 +254,7 @@ internal sealed partial class Loader
     // The keys of each section. FormatSchema builds `tinyprobe schema` from them: a new key needs a description there.
     internal static readonly string[] ApiKeys = ["base_url", "headers", "auth", "endpoints"];
     internal static readonly string[] WorkflowKeys = ["name", "description", "import", "variables", "settings", "steps", .. ApiKeys];
-    internal static readonly string[] EndpointKeys = ["method", "path", "query", "headers", "auth", "body", "form", "multipart", "params"];
+    internal static readonly string[] EndpointKeys = ["method", "path", "query", "headers", "auth", "body", "form", "multipart", "params", "globals"];
     internal static readonly string[] MultipartFileKeys = ["file", "filename", "content_type"];
     internal static readonly string[] StepKeys = ["name", "call", "use", "with", "for_each", "expect", "until", "save", "sleep"];
     internal static readonly string[] SequenceKeys = ["name", "description", "import", "params", "sequence"];
@@ -858,6 +858,17 @@ internal sealed partial class Loader
                 parameters[paramName] = IsNull(value) ? null : Template(file, value);
         }
 
+        // Global variables saved from the response (spec 0023, see EndpointDefinition.Globals).
+        var globals = new Dictionary<string, SaveSource>();
+        if (entries.TryGetValue("globals", out var globalsNode))
+        {
+            foreach (var (globalName, _, value) in Entries(file, globalsNode, "globals"))
+            {
+                if (ParseSave(file, globalName, value) is { } source)
+                    globals[globalName] = source;
+            }
+        }
+
         return new EndpointDefinition
         {
             Name = name,
@@ -872,6 +883,7 @@ internal sealed partial class Loader
             Form = form,
             Multipart = multipart,
             Params = parameters,
+            Globals = globals,
             Location = At(file, keyNode)
         };
     }

@@ -107,6 +107,7 @@ Takes a workflow or an API file (a file without `steps`). A workflow is validate
   "oauth2": { "token_url": "${authUrl}/oauth/token", "client_id": "${clientId}", "client_secret": "${clientSecret}", "scope": "orders:read orders:write", "client_auth": "basic", "form": {} }
   ```
 - `arguments` are the names a call of the endpoint can pass with `--with` (or a step's `with`): its params, its query names and every placeholder of its base URL, path, headers, body, form and multipart fields, `basic_auth` and `oauth2`. Generated values (`${$uuid}`) are not listed. A UI can build the form of an endpoint from `params` (required ones first) and `arguments`.
+- `globals` (since 0.26.0, [spec 0023](specs/0023-global-variables.md)): the global variables the endpoint saves from a 2xx response, each mapped to where its value is read, as in `save` (`{ "token": "$.access_token" }`). The key is there only when the endpoint has `globals`. An argument that another endpoint saves as a global variable needs no value from the user once it is saved.
 - `until`, when present, has the same `status` and `checks` as `expect`, plus `every_ms` and `timeout_ms`.
 - `for_each` is `null`, or `{ "items", "variable", "file" }`:
   - `items` holds the literal items (a data file's are read and listed, with its path in `file`), or is `null` for a variable;
@@ -173,6 +174,7 @@ One JSON object per line on standard output, written and flushed as soon as it h
 - `status` is `null` when no response was received, for example on a network error. Then `response` is `null` too, while `request` shows what was sent.
 - `request` and `response` belong to the last attempt. `headers` keep their order and include content headers. Bodies are text; a response body over 1 MiB is cut and has `body_truncated: true`. A `multipart/form-data` request body is the body as sent with each file's content replaced by one line, `(file ../fixtures/avatar.png, 79 B)`, with `\n` line endings. Headers set by the HTTP client itself (such as `Host`) are not listed. The `Cookie` header is listed as sent: a `Cookie` header of the API file followed by the cookies of the workflow's cookie jar.
 - `saved` holds the values stored by `save` in this step, with their JSON type.
+- `globals` (since 0.26.0, only with `--globals`, only when there are some): the global variables this step saved from its 2xx response, with their JSON type; they are written to the file of `--globals` when the run ends. `globals_missing` lists those of the endpoint not found in the response, as messages (`"user_id: $.user.id not found in the response"`); the step does not fail for them.
 - **`for_each` steps.**
   - `step_started` has `iteration` (1-based) and `iterations` for each item; both are `null` for other steps.
   - `step_completed` is sent once, after the last item. Its `iterations` lists every item, each with `iteration` and the same fields as a step (`name`, `success`, `failure`, `status`, `assertions`, `request`, `response`...).
@@ -268,7 +270,7 @@ endpoints:
 
 ## `call`
 
-`tinyprobe call <file.yaml> <endpoint> [--with name=value]...` runs a workflow of one step that calls the endpoint and accepts **any** status. `<file.yaml>` is an API file or a workflow; with a workflow, its variables and settings apply. `--with` values are typed like `--var`, and they can use variables: `--with 'id=${userId}'`. They are validated like a step's `with`: an unknown endpoint, a missing required param or an unknown argument is an `invalid` event with the file `command line`.
+`tinyprobe call <file.yaml> <endpoint> [--with name=value]... [--globals <file>]` runs a workflow of one step that calls the endpoint and accepts **any** status. With `--globals`, the global variables of the file are read as variables and those the endpoint saves are written back after a 2xx response ([spec 0023](specs/0023-global-variables.md)). `<file.yaml>` is an API file or a workflow; with a workflow, its variables and settings apply. `--with` values are typed like `--var`, and they can use variables: `--with 'id=${userId}'`. They are validated like a step's `with`: an unknown endpoint, a missing required param or an unknown argument is an `invalid` event with the file `command line`.
 
 ## MCP
 

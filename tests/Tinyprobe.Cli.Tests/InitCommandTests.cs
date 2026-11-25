@@ -22,7 +22,7 @@ public sealed class InitCommandTests : IDisposable
         Assert.True(Directory.Exists(PathOf("tinyprobe/workflows")));
         Assert.Contains("baseUrl: http://localhost:5000\n", Read("tinyprobe/env.example.yaml"));
         Assert.Contains("baseUrl: http://localhost:5000\n", Read("tinyprobe/env.local.yaml"));
-        Assert.Equal("tinyprobe/env.*.yaml\n!tinyprobe/env.example.yaml\n", Read(".gitignore"));
+        Assert.Equal("tinyprobe/env.*.yaml\n!tinyprobe/env.example.yaml\nglobals.local.json\n", Read(".gitignore"));
         Assert.StartsWith("## API tests (tinyprobe)\n", Read("AGENTS.md"));
         Assert.Contains("run `tinyprobe guide` and follow it", Read("AGENTS.md"));
         Assert.False(File.Exists(PathOf("CLAUDE.md")));
@@ -59,8 +59,8 @@ public sealed class InitCommandTests : IDisposable
 
         var change = InitCommand.Apply(_root, InitCommand.DefaultBaseUrl).Single(c => c.Path == ".gitignore");
 
-        Assert.Equal("1 line added", change.Note);
-        Assert.Equal("bin/\ntinyprobe/env.*.yaml\n!tinyprobe/env.example.yaml\n", Read(".gitignore"));
+        Assert.Equal("2 lines added", change.Note);
+        Assert.Equal("bin/\ntinyprobe/env.*.yaml\n!tinyprobe/env.example.yaml\nglobals.local.json\n", Read(".gitignore"));
     }
 
     [Fact]

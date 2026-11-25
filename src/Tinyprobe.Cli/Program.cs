@@ -41,6 +41,9 @@ const string Usage = """
       -e, --env <file>        Environment file (YAML) with initial variables, e.g. baseUrl, apiKey.
       --var <name=value>      Set a variable, over the environment file. Repeatable.
       --with <name=value>     ('call' only) An argument of the endpoint, like a step's 'with'. Repeatable.
+      --globals <file>        Global variables, kept in this JSON file between calls. Read as variables (over
+                              the environment file, under --var); the 'globals' of the endpoints called are saved
+                              to it after each 2xx response. Without it, 'globals' keys are ignored.
       --reporter <name>       console (default) or ndjson: one JSON event per line, for tools.
       --junit <file>          ('run' only) Also write a JUnit XML report, for CI servers.
       --to <step>             ('run' only, one workflow) Run up to this step, included, and stop:
@@ -176,6 +179,7 @@ string? envFilePath = null;
 string? junitPath = null;
 string? stopAfter = null;
 string? resumeFrom = null;
+string? globalsPath = null;
 var skip = new List<string>();
 string reporterName = "console";
 bool verbose = false, noColor = false, json = false, source = false;
@@ -204,7 +208,7 @@ for (int i = 1; i < args.Length; i++)
             break;
         case "--junit" or "--to" or "--skip" or "--resume" when command == "call":
             return UsageError($"Option '{option}' is not available for 'call'.");
-        case "-e" or "--env" or "--reporter" or "--var" when command != "inspect":
+        case "-e" or "--env" or "--reporter" or "--var" or "--globals" when command != "inspect":
         case "--with" when command == "call":
         case "--junit" or "--to" or "--skip" or "--resume" when command == "run":
             if (i + 1 >= args.Length)
@@ -226,6 +230,9 @@ for (int i = 1; i < args.Length; i++)
                     break;
                 case "--resume":
                     resumeFrom = value;
+                    break;
+                case "--globals":
+                    globalsPath = value;
                     break;
                 case "--reporter":
                     if (value is not ("console" or "ndjson"))
@@ -356,6 +363,22 @@ catch (WorkflowLoadException ex)
     return ExitUsageError;
 }
 
+// Global variables saved by earlier calls (spec 0023), over the environment file, under --var.
+var globalsRead = new List<GlobalsFile.Entry>();
+if (globalsPath is not null)
+{
+    try
+    {
+        globalsRead = GlobalsFile.Load(globalsPath);
+    }
+    catch (Exception ex) when (ex is GlobalsFileException or IOException or UnauthorizedAccessException)
+    {
+        return UsageError($"--globals: {ex.Message}");
+    }
+    foreach (var entry in globalsRead)
+        environment[entry.Name] = entry.Value;
+}
+
 foreach (var (name, text) in variables)
 {
     try
@@ -381,6 +404,12 @@ if (verbose)
     log.WriteLine("Environment variables:");
     foreach (var (name, value) in environment)
         log.WriteLine($"  {name}: {value.GetRawText()}");
+    if (globalsPath is not null)
+    {
+        log.WriteLine($"Global variables ({globalsPath}):");
+        foreach (var entry in globalsRead)
+            log.WriteLine($"  {entry.Name}: {entry.Value.GetRawText()}  (from {entry.From ?? "?"} at {entry.At ?? "?"})");
+    }
 }
 
 if (suite)
@@ -394,7 +423,8 @@ using var httpClient = new HttpClient(CreateHandler(cookies)) { Timeout = TimeSp
 var engine = new WorkflowEngine(httpClient, log, cookies)
 {
     RecordExchanges = reporterName == "ndjson" || command == "call",
-    EnvironmentFile = envFilePath
+    EnvironmentFile = envFilePath,
+    SaveGlobals = globalsPath is not null
 };
 
 reporter.WriteHeader(GetVersion(), filePath, envFilePath, workflow, environment);
@@ -404,6 +434,25 @@ var stopwatch = Stopwatch.StartNew();
 var report = await reporter.RunAsync(engine, workflow, environment);
 var summary = WorkflowSummary.Create(workflow, report);
 reporter.WriteSummary(summary, stopwatch.Elapsed);
+
+// The global variables saved by this run, written back with the endpoint that saved them and when.
+if (globalsPath is not null)
+{
+    var at = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture);
+    var kept = report.StepReports
+        .SelectMany(step => step.Globals.Select(g => new GlobalsFile.Entry(g.Key, g.Value,
+            workflow.Steps.ElementAtOrDefault(step.Index) is CallStep call ? call.Endpoint.Name : null, at)))
+        .ToList();
+    try
+    {
+        GlobalsFile.Update(globalsPath, kept);
+    }
+    catch (Exception ex) when (ex is GlobalsFileException or IOException or UnauthorizedAccessException)
+    {
+        Console.Error.WriteLine($"Error: --globals: cannot write {globalsPath}: {ex.Message}");
+        return ExitUsageError;
+    }
+}
 
 if (junitPath is not null
     && !RunCommand.WriteJunit(junitPath, JunitReport.Write(GetVersion(), [new JunitRun(filePath, workflow, report, stopwatch.Elapsed, started)])))

@@ -261,7 +261,7 @@ steps:
 | `until` | Polling: repeat the call until conditions pass, every so often, up to a timeout. |
 | `sleep` | A pause, e.g. `sleep: 2s`. |
 
-API files also have auth sets (bearer, API key, Basic, OAuth2 client credentials), query strings, forms and file uploads; workflows have variables, generated values (`${$uuid}`, `${$now+2h}`) and named imports for several services. Everything is in [docs/workflow-format.md](docs/workflow-format.md). [docs/example/](docs/example/) uses every feature against a test server you start with one command, and is what CI runs.
+API files also have auth sets (bearer, API key, Basic, OAuth2 client credentials), query strings, forms and file uploads, and **global variables** for calling endpoints by hand: `globals: { token: $.access_token }` on `login`, and with `tinyprobe call … --globals globals.local.json` every later call of `get_user` gets the token, no workflow needed. Workflows have variables, generated values (`${$uuid}`, `${$now+2h}`) and named imports for several services. Everything is in [docs/workflow-format.md](docs/workflow-format.md). [docs/example/](docs/example/) uses every feature against a test server you start with one command, and is what CI runs.
 
 ## VS Code extension
 
