@@ -3,7 +3,7 @@
 - **Status:** Implemented
 - **Roadmap:** Inbox, "A token for single calls without a workflow" (dogfooding on 2026-11-06 and 2026-11-23)
 - **Repositories:** tinyprobe, tinyprobe-app (tinyprobe-vscode later, see the open questions)
-- **PRs:** see the roadmap
+- **PRs:** [#45](https://github.com/kikutano/tinyprobe/pull/45) (tinyprobe 0.26.0), [tinyprobe-app#33](https://github.com/kikutano/tinyprobe-app/pull/33) (0.4.16)
 
 ## Problem
 
