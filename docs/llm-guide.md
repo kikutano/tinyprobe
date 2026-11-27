@@ -38,7 +38,7 @@ tinyprobe/
 └── env.local.yaml            # NOT committed: real values for the local backend
 ```
 
-Add `tinyprobe/env.*.yaml` to `.gitignore`, except `env.example.yaml`.
+Add `tinyprobe/env.*.yaml` to `.gitignore`, except `env.example.yaml`, and `globals.local.json`: the file of global variables (section 3, `globals`) holds tokens.
 
 If `tinyprobe/` does not exist yet, run `tinyprobe init` first (`--base-url http://localhost:8080` sets `baseUrl` in the env files): it creates these folders and env files, the `.gitignore` lines, and a section in `AGENTS.md` for the next agent. It never overwrites a file.
 
@@ -476,9 +476,9 @@ Follow these steps in order. If the user gives you a Postman collection or the e
    - Rails: `config/routes.rb`; Laravel: `routes/api.php`; Go: `http.HandleFunc`, `r.GET`
 
    For each endpoint note: method, path and path parameters, query parameters, request body fields and validation rules, whether it needs authentication, status codes and response body shape.
-2. **Understand authentication**: how a client obtains a token (login endpoint, the field that contains it), which header carries it, API keys, Basic auth, OAuth2 client credentials (a token URL with a client id and secret). Model each mechanism as an `auth` set: a header, `basic` or `oauth2`.
+2. **Understand authentication**: how a client obtains a token (login endpoint, the field that contains it), which header carries it, API keys, Basic auth, OAuth2 client credentials (a token URL with a client id and secret). Model each mechanism as an `auth` set: a header, `basic` or `oauth2`. Give the login endpoint `globals: { token: <JSONPath of the token> }`: after one login, people (and tinyprobe-app) call the endpoints that need the token by hand, with no workflow. It changes nothing for workflows, which still log in and `save` the token.
 3. **Find real test data**: seed data, fixtures, migrations, test users, `.env.example`, `docker-compose.yml` (base URL and port). Use values that exist in the backend; never invent ids, emails or expected values. If credentials or the base URL cannot be found, ask the user.
-4. **Write the API file** with every endpoint you found. Check it with `tinyprobe inspect tinyprobe/api/<name>.yaml` (exit `0` means valid), then try the main endpoints with `tinyprobe call`, for example `tinyprobe call tinyprobe/api/backend.yaml get_note --with id=1 -e tinyprobe/env.local.yaml`: the checks you write next should match the responses you saw, not the ones you expect. An endpoint that needs a token gets it with `--with token=...` or `--var token=...`, from a `call` of the login endpoint.
+4. **Write the API file** with every endpoint you found. Check it with `tinyprobe inspect tinyprobe/api/<name>.yaml` (exit `0` means valid), then try the main endpoints with `tinyprobe call`, for example `tinyprobe call tinyprobe/api/backend.yaml get_note --with id=1 -e tinyprobe/env.local.yaml`: the checks you write next should match the responses you saw, not the ones you expect. An endpoint that needs a token gets it with `--with token=...` or `--var token=...`, from a `call` of the login endpoint, or, when the login endpoint has `globals`, from the file of `--globals`: `tinyprobe call tinyprobe/api/backend.yaml login -e tinyprobe/env.local.yaml --globals globals.local.json` once, then the other calls with the same `--globals globals.local.json`.
 5. **Write the workflows**, one per feature or resource:
    - a **smoke** workflow: the main read endpoints answer as expected;
    - **auth**: valid login, wrong password (`401`), invalid token (`401`/`403`, with `with: { token: invalid-token }`), and no token at all. A request without the `Authorization` header needs an endpoint without `auth` (e.g. `me_anonymous`): that is a different request, not a variant, so it is the one case where a second endpoint for the same route is right;
@@ -523,6 +523,9 @@ Safety: run workflows only against a **local or test** environment, never agains
 | `duration: 500` or `{ lt: 500 }` | `duration: { lt: 500ms }` |
 | an endpoint per variant (`login_ok`, `login_wrong`) | one `login` endpoint, different `with` |
 | a token in the API file | `Authorization: "Bearer ${token}"` and `save: { token: ... }` |
+| `save` on an endpoint of the API file, so that `tinyprobe call` keeps the token for the next calls | `globals: { token: $.token }` on the login endpoint, and `--globals <file>` on the calls |
+| a workflow that counts on a global variable (no login step, `${token}` from `--globals`) | each workflow logs in and `save`s the token: `globals` is for calls by hand, and `run` without `--globals` (CI) ignores it |
+| `globals` on every endpoint that uses the token | `globals` only on the endpoint whose response gives the value (the login); the others just write `${token}` |
 | `Authorization: "Basic ${basicAuth}"` with the base64 in an env file | `basic: { username: ${user}, password: ${password} }` in the auth set |
 | a token step against `/oauth/token` at the start of every workflow, for client credentials | an `oauth2` auth set; keep a `form` endpoint for the token URL only to test its errors |
 | an `Authorization` header next to `basic` or `oauth2` | remove it: the scheme writes the header |
@@ -582,6 +585,8 @@ endpoints:
     body:
       email: ${email}
       password: ${password}
+    globals:                      # for calls by hand (--globals): the next calls get ${token}
+      token: $.accessToken
 
   me:
     path: /api/me
@@ -816,7 +821,7 @@ Follow this section when the user gives you exports of another API tool (a Postm
 | `basic` auth (`auth.basic[]`: `username`, `password`) | an auth set `basic: { username: ${username}, password: ${password} }`, with the values in the env files (the password only in `env.local.yaml`) |
 | `oauth2` auth with `grant_type` `client_credentials` (`auth.oauth2[]`: `accessTokenUrl`, `clientId`, `clientSecret`, `scope`, `client_authentication`) | an auth set `oauth2: { token_url, client_id, client_secret, scope }`; `client_authentication: header` is `client_auth: basic` (the default), `body` is `client_auth: form`; the secret only in `env.local.yaml`. Drop `tokenName`, `addTokenTo: header` and the other UI settings |
 | collection `variable`s | workflow `variables` for non-secret defaults, otherwise env files |
-| `pm.environment.set("t", pm.response.json().token)` (also `collectionVariables`, `globals`, `pm.variables`) | `save: { t: $.token }` |
+| `pm.environment.set("t", pm.response.json().token)` (also `collectionVariables`, `globals`, `pm.variables`) | `save: { t: $.token }` in the workflows; on a login request, also `globals: { t: $.token }` on its endpoint, so that the other requests still work by hand after one login, as in Postman |
 | `pm.response.to.have.status(201)`, `pm.response.code === 201` | `expect.status: 201` |
 | `pm.response.to.be.success` | no `status` (any 2xx) |
 | `pm.response.to.be.ok` | `status: 200` |
@@ -1251,6 +1256,7 @@ From a README, a script, or "Copy as cURL" in a browser.
 
 - [ ] `tinyprobe run tinyprobe/workflows -e tinyprobe/env.local.yaml` exits `0` against the local backend, or the remaining failures are reported to the user as possible backend bugs.
 - [ ] No real secret in API or workflow files; secrets are in `env.local.yaml`, which is in `.gitignore`.
+- [ ] If an endpoint has `globals`: `globals.local.json` is in `.gitignore`, and no workflow depends on a global variable.
 - [ ] Every endpoint name used by a step exists in an imported API file.
 - [ ] Workflows that create data delete it, and can run twice in a row.
 - [ ] Values that must stay strings are quoted.
