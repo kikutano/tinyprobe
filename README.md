@@ -98,7 +98,7 @@ tinyprobe run hello.yaml
 ```
 
 ```text
-  ⚡ tinyprobe 0.26.0
+  ⚡ tinyprobe 0.26.1
 
   workflow : Hello tinyprobe
   file     : hello.yaml
@@ -196,7 +196,7 @@ That is `.vscode/mcp.json` for VS Code. Cursor reads `.cursor/mcp.json` with `{ 
 
 ```yaml
 - uses: actions/checkout@v4
-- uses: kikutano/tinyprobe@v0.26.0      # installs tinyprobe 0.26.0
+- uses: kikutano/tinyprobe@v0.26.1      # installs tinyprobe 0.26.1
   with:
     path: tinyprobe/workflows
     env-file: tinyprobe/env.ci.yaml
